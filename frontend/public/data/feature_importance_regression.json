@@ -1,0 +1,42 @@
+[
+  {
+    "feature": "numeric__Visit.No",
+    "importance": 0.2634510930025529
+  },
+  {
+    "feature": "boolean__IsRepeatVisit",
+    "importance": 0.248821487371432
+  },
+  {
+    "feature": "boolean__M.Cancer",
+    "importance": 0.09901663328222153
+  },
+  {
+    "feature": "boolean__HasCancerDiagnosis",
+    "importance": 0.08316709712250725
+  },
+  {
+    "feature": "boolean__WorkingDay",
+    "importance": 0.0655495760379031
+  },
+  {
+    "feature": "categorical__Address_In the city",
+    "importance": 0.04494632119532252
+  },
+  {
+    "feature": "categorical__DayOfWeek_Saturday",
+    "importance": 0.041109011948406285
+  },
+  {
+    "feature": "categorical__Address_Out of province",
+    "importance": 0.031625079200639714
+  },
+  {
+    "feature": "categorical__DayOfWeek_Wednesday",
+    "importance": 0.028765983407966256
+  },
+  {
+    "feature": "categorical__Address_Out of city",
+    "importance": 0.01023561961920118
+  }
+]

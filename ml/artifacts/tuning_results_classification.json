@@ -1,0 +1,28 @@
+{
+  "logistic_regression": {
+    "best_score": 0.638086635064185,
+    "best_params": {
+      "model__C": 0.011526449540315618
+    }
+  },
+  "random_forest": {
+    "best_score": 0.6408038955710902,
+    "best_params": {
+      "model__max_depth": 4,
+      "model__max_features": 0.3144091460070617,
+      "model__min_samples_leaf": 2,
+      "model__n_estimators": 393
+    }
+  },
+  "xgboost": {
+    "best_score": 0.6388840406306556,
+    "best_params": {
+      "model__colsample_bytree": 0.6624074561769746,
+      "model__learning_rate": 0.01699897838270077,
+      "model__max_depth": 4,
+      "model__n_estimators": 187,
+      "model__subsample": 0.7334834444556088
+    }
+  },
+  "best_model": "random_forest"
+}

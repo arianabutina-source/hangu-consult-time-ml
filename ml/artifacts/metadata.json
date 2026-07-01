@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-07-01T11:00:38.942574+00:00",
+  "git_commit": null,
+  "library_versions": {
+    "python": "3.14.6",
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.0",
+    "xgboost": "3.3.0"
+  },
+  "random_state": 42,
+  "classification": {
+    "target_column": "IsLongConsultation",
+    "features": [
+      "Visit.No",
+      "WorkingDay",
+      "M.Cancer",
+      "S.Cancer",
+      "IsRepeatVisit",
+      "IsPublicHolidayMakeup",
+      "HasCancerDiagnosis",
+      "Month",
+      "DayOfWeek",
+      "AM_PM",
+      "Gender",
+      "Address"
+    ],
+    "best_model": "random_forest",
+    "best_params": {
+      "model__max_depth": 4,
+      "model__max_features": 0.3144091460070617,
+      "model__min_samples_leaf": 2,
+      "model__n_estimators": 393
+    },
+    "cv_score": 0.6408038955710902,
+    "test_metrics": {
+      "accuracy": 0.6009036144578314,
+      "precision": 0.6054313099041534,
+      "recall": 0.5725075528700906,
+      "f1": 0.5885093167701864,
+      "roc_auc": 0.632275024268982
+    }
+  },
+  "regression": {
+    "target_column": "ServTime_minutes",
+    "features": [
+      "Visit.No",
+      "WorkingDay",
+      "M.Cancer",
+      "S.Cancer",
+      "IsRepeatVisit",
+      "IsPublicHolidayMakeup",
+      "HasCancerDiagnosis",
+      "Month",
+      "DayOfWeek",
+      "AM_PM",
+      "Gender",
+      "Address"
+    ],
+    "best_model": "random_forest",
+    "best_params": {
+      "model__max_depth": 4,
+      "model__max_features": 0.3144091460070617,
+      "model__min_samples_leaf": 2,
+      "model__n_estimators": 393
+    },
+    "cv_score": -4.381701831005353,
+    "test_metrics": {
+      "mae": 4.412945232946264,
+      "rmse": 6.093009589492346,
+      "r2": 0.06576800911614489
+    }
+  }
+}

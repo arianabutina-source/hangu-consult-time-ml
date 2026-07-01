@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: hangu-consult-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO
+      - key: ALLOWED_ORIGINS
+        # Updated to the deployed Vercel frontend URL in Milestone 18.
+        value: http://localhost:5173

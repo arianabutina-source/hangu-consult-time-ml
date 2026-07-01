@@ -1,0 +1,28 @@
+{
+  "ridge": {
+    "best_score": -4.389818180650597,
+    "best_params": {
+      "model__alpha": 45.70563099801453
+    }
+  },
+  "random_forest": {
+    "best_score": -4.381701831005353,
+    "best_params": {
+      "model__max_depth": 4,
+      "model__max_features": 0.3144091460070617,
+      "model__min_samples_leaf": 2,
+      "model__n_estimators": 393
+    }
+  },
+  "xgboost": {
+    "best_score": -4.3880429797394855,
+    "best_params": {
+      "model__colsample_bytree": 0.9400154311159197,
+      "model__learning_rate": 0.04612040833253006,
+      "model__max_depth": 2,
+      "model__n_estimators": 147,
+      "model__subsample": 0.7483273008793065
+    }
+  },
+  "best_model": "random_forest"
+}

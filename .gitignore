@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+data/processed/
+
+# ml/artifacts/ contents ARE tracked (classifier_pipeline.joblib,
+# regressor_pipeline.joblib, metadata.json, tuning/test-metrics JSON) --
+# Render builds the backend Docker image directly from this repo, and the
+# backend loads these serialized pipelines at startup (Milestone 13/14/17).
+
+.env
+*.env
+
+.DS_Store
