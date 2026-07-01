@@ -10,5 +10,7 @@ services:
       - key: LOG_LEVEL
         value: INFO
       - key: ALLOWED_ORIGINS
-        # Updated to the deployed Vercel frontend URL in Milestone 18.
-        value: http://localhost:5173
+        # Deployed Vercel frontend (Milestone 18) -- both the stable project
+        # alias and the deployment-specific alias -- plus localhost for
+        # local frontend development against the live backend.
+        value: https://frontend-ariana5.vercel.app,https://frontend-psi-seven-76.vercel.app,http://localhost:5173
