@@ -15,14 +15,14 @@ const links = [
 export function Navbar() {
   return (
     <header className="border-b border-espresso/10 bg-cream/90 backdrop-blur">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <NavLink to="/" className="flex items-center gap-2">
+      <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-6 py-4">
+        <NavLink to="/" className="flex items-center gap-2 justify-self-start">
           <Logo />
           <span className="font-serif text-lg font-medium text-espresso">
             Optimised Scheduling Tool
           </span>
         </NavLink>
-        <div className="hidden items-center gap-1 sm:flex">
+        <div className="hidden items-center justify-self-center sm:flex">
           {links.map((link) => (
             <NavLink
               key={link.to}
@@ -30,7 +30,7 @@ export function Navbar() {
               end={link.to === "/"}
               className={({ isActive }) =>
                 clsx(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "rounded-md px-2.5 py-2 text-center text-sm font-medium whitespace-nowrap transition-colors",
                   isActive
                     ? "text-terracotta"
                     : "text-espresso-light hover:text-espresso",
@@ -41,6 +41,7 @@ export function Navbar() {
             </NavLink>
           ))}
         </div>
+        <div className="justify-self-end" />
       </nav>
     </header>
   );
