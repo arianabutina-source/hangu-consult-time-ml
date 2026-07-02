@@ -18,11 +18,11 @@ export function Navbar() {
       <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-6 py-4">
         <NavLink to="/" className="flex items-center gap-2 justify-self-start">
           <Logo />
-          <span className="font-serif text-lg font-medium text-espresso">
+          <span className="font-serif text-lg font-medium whitespace-nowrap text-espresso">
             Optimised Scheduling Tool
           </span>
         </NavLink>
-        <div className="hidden items-center justify-self-center sm:flex">
+        <div className="hidden items-center justify-self-center xl:flex">
           {links.map((link) => (
             <NavLink
               key={link.to}
