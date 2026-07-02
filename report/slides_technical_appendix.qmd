@@ -1,0 +1,247 @@
+---
+title: "Predicting Outpatient Consultation Duration"
+subtitle: "A Leakage-Safe ML Pipeline for TDABC-Informed Scheduling"
+author: "Ariana Butina"
+date: today
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    transition: slide
+    incremental: false
+    fig-width: 6.5
+    fig-height: 4
+    embed-resources: true
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+---
+
+```{python}
+#| label: setup
+import json
+from pathlib import Path
+
+from IPython.display import Image
+
+ARTIFACTS = Path("../ml/artifacts")
+
+
+def load_json(name: str) -> dict:
+    with open(ARTIFACTS / name) as f:
+        return json.load(f)
+
+
+clf_metrics = load_json("test_metrics_classification.json")
+reg_metrics = load_json("test_metrics_regression.json")
+clf_tuning = load_json("tuning_results_classification.json")
+metadata = load_json("metadata.json")
+```
+
+## Motivation {.smaller}
+
+Time-Driven Activity-Based Costing needs one core input per activity: **how long it
+takes.**
+
+- 6,637 historical outpatient oncology consultations
+- Two models: **will this visit be long?** and **how many minutes will it take?**
+- Built to support a master's thesis applying TDABC to outpatient scheduling
+- Design priority throughout: **no leakage, no dishonest evaluation** — even where the
+  less impressive choice was the correct one
+
+## System Architecture
+
+```
+GitHub  ──▶  Render (FastAPI + scikit-learn)  ◀── fetch() ──  Vercel (React + Recharts)
+  │
+  └──▶  ml/ pipeline: load → clean → engineer → select → split → transform
+                        → tune → evaluate → explain → persist
+```
+
+Each arrow below is one pipeline stage — and one module in `ml/`.
+
+## `ml/data/load.py` — Load
+
+- **`load_raw_data(path, validate=True)`** — reads `Data.csv`, returns a `DataFrame`
+- **`_validate_schema(df)`** — asserts every expected column is present with the
+  expected dtype *before* anything downstream touches the data
+
+::: {.notes}
+Fail fast: a silently-missing or renamed column should break loading, not corrupt a
+model three steps later.
+:::
+
+## `ml/data/clean.py` — Clean {.smaller}
+
+- **`fill_missing_address(df)`** — fills missing `Address` with an explicit
+  `"Unknown"` category (missingness is plausibly meaningful, not random)
+- **`validate_categorical_domains(df)`** — asserts categorical columns only contain
+  expected values
+- **`check_no_duplicate_rows(df)`** — guards against accidental double-counting
+- **`report_patient_label_inconsistency(df)`** — *reports*, but does not silently
+  "fix," the 33 patients whose `M.Cancer` flag changes across visits
+- **`clean_data(df)`** — orchestrates the above into one call
+
+## `ml/data/features.py` — Engineer {.smaller}
+
+- **`add_service_time_minutes(df)`** — seconds → minutes (both targets derive from this)
+- **`compute_long_consultation_threshold(df)`** — the dataset-wide median, computed
+  **once** and frozen as a business-rule constant
+- **`add_long_consultation_label(df, threshold)`** — applies that frozen threshold
+- **`add_repeat_visit_flag`**, **`add_public_holiday_makeup_flag`**,
+  **`add_combined_cancer_flag`** — the three engineered features, each mapping
+  directly to an EDA finding
+- **`engineer_features(df, threshold=None)`** — orchestrates all of the above
+
+## `ml/data/feature_selection.py` — Select {.smaller}
+
+- **`get_classification_features()`** / **`get_regression_features()`** — the frozen,
+  shared 12-column predictor list
+- **`_validate_no_leakage(feature_list, target_column)`** — asserts neither target,
+  nor any column that perfectly determines it, appears in the predictor list
+- **`select_classification_data(df)`** / **`select_regression_data(df)`** — return
+  `(X, y)`, leakage-checked
+
+## `ml/data/split.py` — Split
+
+- **`grouped_stratified_split(df, ...)`** — `StratifiedGroupKFold`, grouped by
+  patient `ID`, stratified by `IsLongConsultation`
+- **`assert_no_group_leakage(train, test, group_col)`** — asserts zero patient overlap
+  between train and test — not a comment, an executable check
+- **`create_train_test_split()`** / **`save_split()`** / **`get_train_test_split()`** —
+  build once, persist to `data/processed/`, reload without re-splitting
+
+## `ml/preprocessing/column_transformer.py` — Transform
+
+- **`build_classification_transformer()`** / **`build_regression_transformer()`** —
+  one shared `ColumnTransformer`: median-impute + scale the numeric feature,
+  most-frequent-impute the booleans, most-frequent-impute + one-hot
+  (`handle_unknown="ignore"`) the categoricals
+- Always **fit on the training fold only** — never on the full dataset
+
+## `ml/training/cv_utils.py` + `search.py` — Tune {.smaller}
+
+- **`get_classification_cv()`** / **`get_regression_cv()`** — group-aware CV splitters
+- **`assert_cv_has_no_group_leakage(...)`** — the same leakage check, enforced again
+  at the CV-fold level
+- **`run_randomized_search(pipeline, param_grid, cv, ...)`** — `RandomizedSearchCV`
+  wrapper, seeded
+- **`save_tuning_results()`** / **`load_tuning_results()`** /
+  **`build_best_pipeline_from_results()`** — persist and rehydrate tuning output
+
+## `ml/training/train_classifier.py` / `train_regressor.py` {.smaller}
+
+- **`tune_classifier(model_name, ...)`** / **`tune_regressor(model_name, ...)`** —
+  one call per candidate model family
+- **`tune_all_classifiers()`** / **`tune_all_regressors()`** — runs Logistic/Ridge,
+  Random Forest, and XGBoost through the same search
+- **`select_best_classifier()`** / **`select_best_regressor()`** — picks the winner by
+  CV score — **`random_forest` won both tasks**
+
+## Tuning Results
+
+```{python}
+#| label: tbl-tuning
+import pandas as pd
+
+rows = [{"Model": k.replace("_", " ").title(), "CV ROC-AUC": round(v["best_score"], 4)}
+        for k, v in clf_tuning.items() if k != "best_model"]
+pd.DataFrame(rows).sort_values("CV ROC-AUC", ascending=False).reset_index(drop=True)
+```
+
+All three model families land within ~0.003 ROC-AUC of each other — the feature set's
+signal ceiling, not the model choice, is the binding constraint.
+
+## `ml/evaluation/metrics.py` + `evaluate_*.py` — Evaluate, Once, Honestly {.smaller}
+
+- **`classification_metrics()`** / **`regression_metrics()`** — accuracy, precision,
+  recall, F1, ROC-AUC / MAE, RMSE, R²
+- **`plot_confusion_matrix()`**, **`plot_roc_curve()`**, **`plot_residuals()`** —
+  the exact figures on the next slides
+- **`evaluate_classifier_on_test_set()`** / **`evaluate_regressor_on_test_set()`** —
+  refit on full train, score on held-out test — **exactly once**
+- **`run_classification_evaluation()`** / **`run_regression_evaluation()`** —
+  orchestrate + save metrics as JSON artifacts (the numbers on this deck come
+  straight from those files, not from re-running anything)
+
+## `ml/evaluation/explainability.py` — Explain
+
+- **`get_feature_names(pipeline)`** — recovers human-readable names after one-hot
+  encoding
+- **`get_feature_importance(pipeline)`** — Random Forest's built-in importances
+- **`compute_shap_values(pipeline, X)`** — SHAP values for a deeper, per-feature view
+- **`plot_feature_importance()`** / **`plot_shap_summary()`** — the figures used in
+  the report and dashboard
+
+## `ml/persistence.py` — Persist, Reproducibly {.smaller}
+
+- **`save_pipeline()`** / **`load_pipeline()`** — joblib serialization of the fitted
+  `Pipeline` (preprocessing + model together, one artifact)
+- **`get_git_commit_hash()`** — stamps the exact commit that produced an artifact
+- **`get_library_versions()`** — records pandas/scikit-learn/numpy versions
+- **`build_metadata()`** — writes `metadata.json`: seed, features, best params, test
+  metrics, commit hash, library versions — everything needed to explain *why* a number
+  is what it is, months later
+
+## Results — Classification
+
+```{python}
+#| label: fig-confusion-matrix
+#| fig-cap: "Confusion matrix (held-out test set)"
+Image("figures/confusion_matrix.png")
+```
+
+ROC-AUC = `{python} f"{clf_metrics['roc_auc']:.3f}"` — better than chance, far from decisive.
+
+## Results — Regression
+
+```{python}
+#| label: fig-residuals
+#| fig-cap: "Residuals vs. predicted (held-out test set)"
+Image("figures/residuals.png")
+```
+
+R² = `{python} f"{reg_metrics['r2']:.3f}"` — long visits are systematically underestimated.
+
+## Feature Importance
+
+```{python}
+#| label: fig-feature-importance
+#| fig-cap: "Random Forest feature importances (classification)"
+Image("figures/feature_importance_classification.png")
+```
+
+`Visit.No` and `IsRepeatVisit` dominate — far ahead of diagnosis or calendar features.
+
+## What This Means for TDABC
+
+- **Visit history — not diagnosis, not day-of-week — is the dominant driver of
+  consultation length.**
+- Segment cost-driver rates by **new vs. returning patient**, not by calendar or
+  diagnosis category.
+- Treat predictions as a **capacity-planning aid**, not a precise per-slot scheduler or
+  clinical signal.
+
+## Honest Limitations
+
+- Regression explains only a small share of duration variance — the available fields
+  are scheduling metadata, not clinical complexity
+- Single clinic, 2018–2019 — generalisation to other clinics/specialties is untested
+- 33 patients have an inconsistent `M.Cancer` flag across visits, left uncorrected by
+  design
+- `S.Cancer` is rare (~1%) — its individual contribution is hard to estimate reliably
+
+## Live Demo
+
+- **App:** [frontend-psi-seven-76.vercel.app](https://frontend-psi-seven-76.vercel.app)
+- **API docs:** [hangu-consult-backend.onrender.com/docs](https://hangu-consult-backend.onrender.com/docs)
+- **Source:** [github.com/arianabutina-source/hangu-consult-time-ml](https://github.com/arianabutina-source/hangu-consult-time-ml)
+
+## Conclusion
+
+A fully reproducible, leakage-audited pipeline — every stage tested, every evaluation
+run exactly once — turns ordinary scheduling data into a genuinely useful, honestly
+limited signal for outpatient capacity planning and TDABC cost-driver estimation.
+
+**Thank you.**

@@ -14,15 +14,39 @@ through a FastAPI backend and an interactive React dashboard.
 > The backend is on Render's free tier and spins down when idle — the first request after
 > a while can take 30–60 seconds to wake up.
 
+## Course Deliverables
+
+| # | Deliverable | Where |
+|---|---|---|
+| D1 | Reproducible analysis report (Quarto → HTML) | [`report/report.qmd`](report/report.qmd) → [`report.html`](report/report.html) |
+| D2 | Deployed web app (React) | https://frontend-psi-seven-76.vercel.app |
+| D3 | AI-workflow reflection | [`report/ai_workflow_reflection.qmd`](report/ai_workflow_reflection.qmd) → [`.html`](report/ai_workflow_reflection.html) / [`.pdf`](report/ai_workflow_reflection.pdf) |
+| D4 | Presentation (Quarto reveal.js, non-technical) | [`report/slides.qmd`](report/slides.qmd) → [`slides.html`](report/slides.html) |
+| D5 | Executive summary (1 page, plain language) | [`report/executive_summary.qmd`](report/executive_summary.qmd) → [`.html`](report/executive_summary.html) / [`.pdf`](report/executive_summary.pdf) |
+
+To view any rendered `.html` deliverable, download it and open it in a browser (each is
+a self-contained file, images and all — no server needed). D1's reproducibility is
+verified by cloning this repo fresh, creating a new virtual environment from
+`requirements.txt`, and running `quarto render report.qmd` from `report/` (see
+**Setup** below) — no other steps required.
+
+Two supplementary, non-required documents also live in `report/`:
+[`presentation.html`](report/presentation.html) (a short written summary from an earlier
+project phase) and [`slides_technical_appendix.html`](report/slides_technical_appendix.html)
+(a deeper, code-level walkthrough of the `ml/` pipeline for anyone who wants the
+function-by-function detail — not the D4 deliverable itself, which is audience-appropriate
+for a non-technical reader).
+
 ## Reports
 
 Rendered, reproducible outputs live under [`report/`](report/):
 
 | Document | Purpose |
 |---|---|
-| [`report.html`](report/report.html) | Full academic report — methodology, results, discussion |
-| [`presentation.html`](report/presentation.html) | Short summary for a capstone defense |
-| [`executive_summary.pdf`](report/executive_summary.pdf) | 2-page, jargon-light summary for a business/clinical audience |
+| [`report.html`](report/report.html) | Full academic report — methodology, results, discussion (**D1**) |
+| [`slides.html`](report/slides.html) | Presentation deck for a non-technical audience (**D4**) |
+| [`executive_summary.pdf`](report/executive_summary.pdf) | 1-page, jargon-light summary (**D5**) |
+| [`ai_workflow_reflection.pdf`](report/ai_workflow_reflection.pdf) | AI-workflow reflection (**D3**) |
 | [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb) | Executed exploratory data analysis notebook |
 
 ## The Problem, in Brief
@@ -92,6 +116,22 @@ pip install -r requirements.txt
 
 ```bash
 pytest tests/
+```
+
+### Render the report (D1), presentation (D4), executive summary (D5), and reflection (D3)
+
+Requires [Quarto](https://quarto.org/docs/get-started/) installed separately (not a pip
+package). All figures and metrics these documents use are already committed to the repo
+(`ml/artifacts/`, `report/figures/`), so rendering does **not** require retraining first:
+
+```bash
+cd report
+quarto render report.qmd                        # D1 -> report.html
+quarto render slides.qmd                        # D4 -> slides.html
+quarto render executive_summary.qmd --to html   # D5 -> executive_summary.html
+quarto render executive_summary.qmd --to pdf    # D5 -> executive_summary.pdf (requires LaTeX/typst)
+quarto render ai_workflow_reflection.qmd --to html
+quarto render ai_workflow_reflection.qmd --to pdf
 ```
 
 ### Retrain the models from scratch

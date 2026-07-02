@@ -11,63 +11,43 @@ format:
   pdf:
     documentclass: article
     fontsize: 11pt
-    geometry: margin=1in
+    geometry: margin=0.85in
 ---
 
-## The Problem
+## The Question
 
-Clinics need to know how long a consultation will take — both to build a workable daily
-schedule and to estimate what each visit actually costs to deliver. In practice, most
-clinics fall back on a single generic appointment length for every patient, which leads
-to some slots running short and others running long, and makes it hard to answer a basic
-costing question: *how much clinician time does a typical visit really require?*
+How long will a given outpatient consultation take — and can that be predicted well
+enough, using only information already known at booking, to plan clinic capacity and
+estimate the true cost of a visit?
 
-## What We Built
+## What We Built and Found
 
-Using two years of real visit records from an outpatient oncology clinic (6,637
-consultations), we built two simple prediction tools that use only information already
-known at the time an appointment is booked — things like whether the patient has visited
-before, the day and time of the appointment, and whether a cancer diagnosis is on file:
+Using two years of real visit records (6,637 consultations), we built two tools that use
+only booking-time details — whether the patient has visited before, the day and time of
+the appointment, and whether a cancer diagnosis is on file — to (1) flag whether a visit
+is likely to run long, and (2) estimate its duration in minutes.
 
-1. **A "long visit" flag** — predicts whether a given appointment is likely to run longer
-   than the clinic's own typical visit.
-2. **A duration estimate** — predicts roughly how many minutes a given appointment will
-   take.
+- **The "long visit" flag is moderately reliable** — correct about 6 times out of 10,
+  clearly better than guessing but not precise enough to be the only scheduling factor.
+- **The duration estimate is directionally useful, not exact** — typically within a
+  little over four minutes on average, enough for capacity planning, not for setting one
+  slot with confidence.
+- **The single biggest driver of visit length is whether the patient has been seen
+  before** — far ahead of the day of week, time of day, or diagnosis on record.
 
-Both tools are available through a simple web form, so a scheduler can enter a few known
-details about an upcoming visit and get an immediate estimate.
+## What We Recommend
 
-## What We Found
-
-- **The "long visit" flag is moderately reliable.** It correctly identifies a long visit
-  as "long" about 6 times out of 10 — clearly better than guessing, but not precise
-  enough to be the only factor in a scheduling decision.
-- **The duration estimate is directionally useful, not exact.** On average, it misses the
-  actual visit length by a little over four minutes. That is accurate enough to plan
-  overall clinic capacity, but not precise enough to set an individual appointment slot
-  with confidence.
-- **The single biggest driver of visit length, by far, is whether the patient has been
-  seen before — not the day of the week, the time of day, or the diagnosis on record.**
-  Returning patients and first-time patients behave differently enough that this one
-  piece of information matters more than everything else combined.
-
-## What This Means in Practice
-
-- **For scheduling:** use the tools to plan overall daily or weekly capacity and staffing
-  levels, rather than to fix the exact length of any single appointment.
-- **For costing (Time-Driven Activity-Based Costing):** the clearest, most defensible way
-  to estimate the "time" side of a cost-per-visit calculation is to separate new-patient
-  visits from returning-patient visits — this distinction carries far more real signal
-  than segmenting by day, time slot, or diagnosis category.
-- **For future improvement:** the tools currently only see scheduling information, not
-  clinical detail (for example, the specific reason for the visit or its complexity).
-  Capturing even a little more of that detail would likely improve accuracy meaningfully.
+- **Scheduling:** use these estimates to plan overall daily/weekly capacity and staffing,
+  not to fix the exact length of any one appointment.
+- **Costing (Time-Driven Activity-Based Costing):** segment cost-driver time estimates by
+  **new vs. returning patient** — this carries far more real signal than segmenting by
+  day, time slot, or diagnosis category.
+- **Next step:** capture a little more clinical detail (reason for visit, complexity) to
+  improve accuracy — scheduling data alone has a real but limited ceiling.
 
 ## Bottom Line
 
-Ordinary scheduling data — visit history, timing, and a basic diagnosis flag — is enough
-to produce a genuinely useful, if imperfect, estimate of how long a consultation will
-take and to flag visits at risk of running long. That is enough to support smarter
-capacity planning and a more evidence-based costing model today, while making clear that
-these estimates are a planning aid for administrators, not a substitute for clinical
-judgment on any individual appointment.
+Ordinary scheduling data is enough to produce a genuinely useful, if imperfect, estimate
+of consultation length and to flag visits at risk of running long — enough to support
+smarter capacity planning and a more evidence-based costing model today, as a planning
+aid for administrators, not a substitute for clinical judgment on any individual visit.
