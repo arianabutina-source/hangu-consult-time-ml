@@ -139,10 +139,26 @@ export function DashboardPage() {
 
       <Section title="Classification — Long vs. Short Consultation">
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
-          <MetricsCard label="Accuracy" value={clfMetrics ? clfMetrics.accuracy.toFixed(3) : "…"} />
-          <MetricsCard label="Precision" value={clfMetrics ? clfMetrics.precision.toFixed(3) : "…"} />
-          <MetricsCard label="Recall" value={clfMetrics ? clfMetrics.recall.toFixed(3) : "…"} />
-          <MetricsCard label="F1" value={clfMetrics ? clfMetrics.f1.toFixed(3) : "…"} />
+          <MetricsCard
+            label="Accuracy"
+            value={clfMetrics ? clfMetrics.accuracy.toFixed(3) : "…"}
+            hint="Share of all predictions — long or short — that were correct."
+          />
+          <MetricsCard
+            label="Precision"
+            value={clfMetrics ? clfMetrics.precision.toFixed(3) : "…"}
+            hint="Of the visits flagged “long,” how many actually were."
+          />
+          <MetricsCard
+            label="Recall"
+            value={clfMetrics ? clfMetrics.recall.toFixed(3) : "…"}
+            hint="Of the visits that were actually long, how many got flagged."
+          />
+          <MetricsCard
+            label="F1"
+            value={clfMetrics ? clfMetrics.f1.toFixed(3) : "…"}
+            hint="A single balance of precision and recall."
+          />
           <MetricsCard
             label="ROC-AUC"
             value={clfMetrics ? clfMetrics.roc_auc.toFixed(3) : "…"}
