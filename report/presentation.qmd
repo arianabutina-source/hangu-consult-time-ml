@@ -1,0 +1,112 @@
+---
+title: "Predicting Outpatient Consultation Duration"
+subtitle: "Capstone Project Summary — Hangu Outpatient Oncology Clinic"
+author: "Ariana Butina"
+date: today
+format:
+  html:
+    toc: false
+    number-sections: false
+    theme: cosmo
+    embed-resources: true
+    fig-width: 6.5
+    fig-height: 4
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+---
+
+```{python}
+#| label: setup
+import json
+from pathlib import Path
+
+from IPython.display import Image
+
+ARTIFACTS = Path("../ml/artifacts")
+
+
+def load_json(name: str) -> dict:
+    with open(ARTIFACTS / name) as f:
+        return json.load(f)
+
+
+clf_metrics = load_json("test_metrics_classification.json")
+reg_metrics = load_json("test_metrics_regression.json")
+metadata = load_json("metadata.json")
+```
+
+## Motivation
+
+Time-Driven Activity-Based Costing (TDABC) needs one core input per activity:
+**how long it takes.** This project builds two machine learning models on 6,637
+historical outpatient oncology consultations to predict exactly that — supporting a
+master's thesis applying TDABC to outpatient scheduling.
+
+- **Classifier** — will this consultation be *long* or *short*, relative to the clinic's
+  own history?
+- **Regressor** — how many minutes will this consultation take?
+
+## System Architecture
+
+```
+GitHub  ──▶  Render (FastAPI + scikit-learn)  ◀── fetch() ──  Vercel (React + Recharts)
+  │
+  └──▶  ml/ pipeline: load → clean → engineer → split → tune → evaluate → persist
+```
+
+- **ML pipeline**: pandas, scikit-learn, XGBoost (compared, not selected) — reproducible,
+  leakage-audited, versioned artifacts
+- **Backend**: FastAPI, serving both models behind separate, documented REST endpoints
+- **Frontend**: React + Vite + TypeScript + Tailwind + Recharts, with a live prediction
+  form and an interactive results dashboard
+- **Deployment**: GitHub → Render (backend) and GitHub → Vercel (frontend), both
+  auto-deploying on push
+
+## Key Results
+
+::: {layout-ncol="2"}
+```{python}
+#| label: fig-confusion-matrix
+#| fig-cap: "Classification: confusion matrix (held-out test set)"
+Image("figures/confusion_matrix.png")
+```
+
+```{python}
+#| label: fig-residuals
+#| fig-cap: "Regression: residuals vs. predicted (held-out test set)"
+Image("figures/residuals.png")
+```
+:::
+
+| Task | Metric | Value |
+|---|---|---|
+| Classification | Accuracy | `{python} f"{clf_metrics['accuracy']:.3f}"` |
+| Classification | ROC-AUC | `{python} f"{clf_metrics['roc_auc']:.3f}"` |
+| Regression | MAE | `{python} f"{reg_metrics['mae']:.2f} min"` |
+| Regression | R² | `{python} f"{reg_metrics['r2']:.3f}"` |
+
+**Headline finding:** across both tasks, **patient visit history** (`Visit.No`,
+`IsRepeatVisit`) is by far the strongest predictor — well ahead of diagnosis flags or
+calendar/scheduling context. For TDABC, this points toward visit-history-based patient
+segmentation as the more promising basis for outpatient cost-driver estimation, rather
+than segmentation by day, month, or diagnosis.
+
+**Honest limitation:** the regression model explains only a small share of duration
+variance (R² ≈ 0.07); the available scheduling fields cannot capture the clinical
+complexity that likely drives most of a consultation's actual length. Predictions should
+inform scheduling and capacity planning, not clinical decisions.
+
+## Live Demo
+
+- **Frontend:** [frontend-psi-seven-76.vercel.app](https://frontend-psi-seven-76.vercel.app)
+- **Backend API docs:** [hangu-consult-backend.onrender.com/docs](https://hangu-consult-backend.onrender.com/docs)
+- **Source code:** [github.com/arianabutina-source/hangu-consult-time-ml](https://github.com/arianabutina-source/hangu-consult-time-ml)
+
+## Takeaway
+
+A fully reproducible, leakage-audited ML pipeline — trained, evaluated once and honestly,
+served through a documented API, and presented through an interactive dashboard — turns a
+single clinic's scheduling data into an actionable signal for TDABC-style cost-driver
+planning, while being transparent about exactly how far that signal goes.
