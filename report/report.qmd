@@ -1,0 +1,361 @@
+---
+title: "Predicting Outpatient Consultation Duration"
+subtitle: "A Machine Learning Pipeline for the Hangu Outpatient Oncology Clinic, in Support of Time-Driven Activity-Based Costing"
+author: "Ariana Butina"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    theme: cosmo
+    code-fold: true
+    code-tools: true
+    embed-resources: true
+    fig-width: 7
+    fig-height: 4.5
+bibliography: references.bib
+jupyter: python3
+execute:
+  echo: false
+  warning: false
+---
+
+```{python}
+#| label: setup
+import json
+from pathlib import Path
+
+import pandas as pd
+
+ARTIFACTS = Path("../ml/artifacts")
+
+
+def load_json(name: str) -> dict:
+    with open(ARTIFACTS / name) as f:
+        return json.load(f)
+
+
+clf_metrics = load_json("test_metrics_classification.json")
+reg_metrics = load_json("test_metrics_regression.json")
+clf_tuning = load_json("tuning_results_classification.json")
+reg_tuning = load_json("tuning_results_regression.json")
+metadata = load_json("metadata.json")
+
+
+def tuning_table(tuning: dict, score_label: str, negate: bool = False) -> pd.DataFrame:
+    rows = []
+    for name, result in tuning.items():
+        if name == "best_model":
+            continue
+        score = result["best_score"]
+        if negate:
+            score = -score
+        rows.append({"Model": name.replace("_", " ").title(), score_label: round(score, 4)})
+    return pd.DataFrame(rows).sort_values(score_label, ascending=not negate).reset_index(drop=True)
+```
+
+## Introduction and Motivation
+
+This report documents a complete, reproducible machine learning pipeline for predicting
+outpatient consultation duration at the Hangu outpatient oncology clinic. Two models are
+built from the same historical data: a **classifier** that flags whether a consultation
+will be *long* relative to the clinic's own history, and a **regressor** that predicts the
+consultation's duration directly, in minutes.
+
+The motivation is applied rather than purely academic. This project supports a master's
+thesis at the University of Ljubljana School of Economics and Business applying the
+**Time-Driven Activity-Based Costing (TDABC)** framework [@kaplan2004tdabc] to outpatient
+services. TDABC is built on two inputs for every activity: a *capacity cost rate* and the
+*time required to perform the activity*. Consultation duration is exactly the second input
+— so a model that predicts it, and that is honest about how well it predicts it, is directly
+useful for estimating per-visit cost drivers and for evaluating whether routinely available
+scheduling variables (day of week, time of day, visit history, diagnosis flags) carry enough
+signal to inform capacity planning.
+
+Every methodological choice below is made with two requirements in mind: **no data leakage**
+and **honest evaluation**. Where a modelling decision could look more impressive by cutting
+either corner, the less impressive, more honest choice was made instead, and is documented
+as such.
+
+## Dataset
+
+The data is the **Hangu Open Data** outpatient consultation dataset [@feng2023dataset;
+@feng2024adaptive], licensed CC BY-NC-SA 4.0. It contains **6,637 consultation records**
+from **2,429 unique patients** at a single clinic, collected across 2018–2019. Because many
+patients have repeat visits, the rows are *not* independent observations — a fact that
+shapes the train/test splitting and cross-validation strategy described in
+@sec-methodology.
+
+Each row records:
+
+- `Visit.No` — the patient's visit number at this clinic (1 = first visit)
+- `Gender`, `M.Cancer`, `S.Cancer` — patient demographic and primary/secondary cancer flags
+- `Month`, `DayOfWeek`, `AM_PM`, `WorkingDay` — scheduling context for the visit
+- `Address` — patient's home region (in the city / out of city / out of province)
+- `ServTime` — the recorded consultation duration, in seconds (the source of both targets)
+
+A small number of fields present in the raw file (`ID`, `Session`, `StartTime`, `PayTime`)
+are **not** used as predictors; the rationale for excluding each is given in
+@sec-feature-selection.
+
+## Exploratory Data Analysis
+
+The full exploratory analysis is available as a standalone, executed notebook
+(`notebooks/01_eda.ipynb`); the key findings that shaped every downstream decision are
+summarised here.
+
+```{python}
+#| label: fig-servtime-dist
+#| fig-cap: "Consultation duration is right-skewed: most visits last 8-16 minutes, with a long tail out to nearly an hour."
+from IPython.display import Image
+
+Image("figures/eda_servtime_distribution.png")
+```
+
+```{python}
+#| label: fig-missingness
+#| fig-cap: "Missing values are concentrated in two columns: `Address` (~36%) and `PayTime` (~4%)."
+Image("figures/eda_missingness.png")
+```
+
+```{python}
+#| label: fig-workingday
+#| fig-cap: "Day of week versus the WorkingDay flag. Saturday is normally non-working, but a subset of Saturdays are marked as working -- a compensatory-holiday scheduling pattern, not noise."
+Image("figures/eda_workingday_heatmap.png")
+```
+
+Three findings mattered most:
+
+1. **Repeat visits are common.** 1,192+ patients appear more than once in the data, so a
+   plain random train/test split would let the same patient leak across both sets.
+2. **`Address` missingness is likely informative, not random**, given its scale (over a
+   third of rows) — treating it as its own category was preferred over imputation.
+3. **`WorkingDay` is not redundant with `DayOfWeek`.** The clinic operates mainly
+   Wednesday and Saturday; a subset of Saturdays are marked as working days, consistent
+   with a compensatory-holiday scheduling pattern. This directly motivated one of the
+   engineered features described next.
+
+## Data Cleaning and Feature Engineering
+
+Every cleaning rule was a deliberate response to a finding above, not a generic default:
+
+- **`Address`** missing values were filled with an explicit `"Unknown"` category rather
+  than imputed, since missingness itself is plausibly meaningful.
+- **`PayTime`/`StartTime`** were left untouched: cross-checking showed
+  `PayTime − StartTime` does not reliably reconstruct `ServTime`, so these timestamps are
+  unreliable and were never used to derive or validate the target.
+- **Inconsistent `M.Cancer` flags across a patient's repeat visits** (33 patients) were
+  *not* forcibly reconciled — a diagnosis can legitimately change between visits, so this
+  is reported for transparency rather than corrected.
+- **`ServTime` outliers** (high-duration visits) were kept. A long consultation is a
+  plausible clinical outcome, not a data error.
+
+Three features were engineered, each mapping directly to a requirement or an EDA finding:
+
+| Feature | Definition | Rationale |
+|---|---|---|
+| `IsRepeatVisit` | `Visit.No > 1` | Captures first-time vs. returning patients |
+| `IsPublicHolidayMakeup` | `WorkingDay` true on a normally non-working Saturday | Operationalises the "public holiday" scheduling signal found in EDA |
+| `HasCancerDiagnosis` | `M.Cancer OR S.Cancer` | `S.Cancer` alone is rare (~1%) and too sparse to be a useful standalone predictor |
+
+## Feature Selection {#sec-feature-selection}
+
+The final predictor set is identical for both tasks (12 columns): `Visit.No`,
+`WorkingDay`, `M.Cancer`, `S.Cancer`, `IsRepeatVisit`, `IsPublicHolidayMakeup`,
+`HasCancerDiagnosis`, `Month`, `DayOfWeek`, `AM_PM`, `Gender`, `Address`.
+
+The following columns are deliberately excluded, with reasons:
+
+| Column | Reason for exclusion |
+|---|---|
+| `ID` | Patient identifier; used only to group the train/test split, never as a predictor |
+| `Session` | A near-unique sequential index (381 distinct values across 6,637 rows) — a proxy for data-collection order, not a genuine driver of duration |
+| `StartTime`, `PayTime` | Shown in EDA to be unreliable; not used to build any feature |
+| `ServTime` | The raw target itself (seconds) — direct leakage |
+| `ServTime_minutes` | The regression target; also perfectly determines the classification label via the frozen threshold below, so it would leak into classification too |
+| `IsLongConsultation` | The classification target; excluded from regression predictors for the same reverse-leakage reason |
+
+## Methodology {#sec-methodology}
+
+**Targets.** The regression target is `ServTime` converted to minutes. The classification
+target, `IsLongConsultation`, is defined by a **fixed threshold: the dataset-wide median
+duration (12.08 minutes)**, computed once from the full historical population and frozen
+as a business-rule constant — analogous to a fixed clinical cutoff (e.g. "BMI > 30 is
+obese"). This is a label-*definition* choice, not a fitted preprocessing statistic, so
+deriving it from the full population does not leak information across the train/test
+split. It also yields a close to balanced label (49.8% positive), which keeps
+classification metrics meaningful.
+
+**Preprocessing.** A single `ColumnTransformer` is shared by both tasks: median imputation
+and standard scaling for the one numeric feature; most-frequent imputation for boolean
+flags; most-frequent imputation and one-hot encoding (with `handle_unknown="ignore"`) for
+categorical features. It is always fit on the training fold only.
+
+**Splitting.** Because rows are grouped by patient, both the train/test split and every
+cross-validation fold use `StratifiedGroupKFold`, grouped by patient `ID` and stratified by
+`IsLongConsultation`. This guarantees no patient's visits are ever split across train and
+validation/test. The held-out test set is **5,309 train / 1,328 test rows** (≈80/20), with
+near-identical class balance on both sides (49.8% / 49.8%).
+
+**Model selection.** Three estimator families were compared per task via
+`RandomizedSearchCV` over the group-aware cross-validation: `LogisticRegression`/`Ridge`,
+`RandomForestClassifier`/`Regressor`, and `XGBClassifier`/`Regressor`. All estimators use a
+fixed random seed (`random_state=42`).
+
+**Honest evaluation.** The selected model per task was refit once on the full training set
+and scored **exactly once** on the held-out test set. Those numbers — reported below — were
+never fed back into further tuning.
+
+## Classification Results: Long vs. Short Consultation
+
+```{python}
+#| label: tbl-clf-tuning
+tuning_table(clf_tuning, "CV ROC-AUC")
+```
+
+`{python} clf_tuning["best_model"].replace("_", " ").title()` was selected, narrowly
+outperforming the other two candidates — all three land within about 0.003 ROC-AUC of each
+other, suggesting the ceiling on predictive signal from this feature set is fairly firm
+regardless of model family.
+
+**Held-out test set (evaluated once):**
+
+```{python}
+#| label: tbl-clf-test
+pd.DataFrame(
+    [{"Metric": k.replace("_", " ").upper() if k == "roc_auc" else k.title(), "Value": round(v, 3)}
+     for k, v in clf_metrics.items()]
+)
+```
+
+```{python}
+#| label: fig-confusion-matrix
+#| fig-cap: "Confusion matrix on the held-out test set."
+Image("figures/confusion_matrix.png")
+```
+
+```{python}
+#| label: fig-roc-curve
+#| fig-cap: "ROC curve on the held-out test set (AUC = 0.632)."
+Image("figures/roc_curve.png")
+```
+
+```{python}
+#| label: fig-feature-importance-clf
+#| fig-cap: "Random Forest feature importances (classification)."
+Image("figures/feature_importance_classification.png")
+```
+
+```{python}
+#| label: fig-shap-clf
+#| fig-cap: "SHAP summary (classification)."
+Image("figures/shap_summary_classification.png")
+```
+
+An accuracy of `{python} f"{clf_metrics['accuracy']:.1%}"` and ROC-AUC of
+`{python} f"{clf_metrics['roc_auc']:.3f}"` indicate the model captures real, but modest,
+signal — meaningfully better than the ~50% majority-class baseline, but far from a
+clinically decisive classifier. The most important predictors by a wide margin are
+`Visit.No` and `IsRepeatVisit` — together accounting for roughly half of total feature
+importance — far outweighing cancer-diagnosis flags or calendar features.
+
+## Regression Results: Consultation Duration in Minutes
+
+```{python}
+#| label: tbl-reg-tuning
+tuning_table(reg_tuning, "CV MAE (minutes)", negate=True)
+```
+
+**Held-out test set (evaluated once):**
+
+```{python}
+#| label: tbl-reg-test
+pd.DataFrame(
+    [{"Metric": k.upper() if k in ("mae", "rmse", "r2") else k.title(), "Value": round(v, 3)}
+     for k, v in reg_metrics.items()]
+)
+```
+
+```{python}
+#| label: fig-residuals
+#| fig-cap: "Residuals vs. predicted duration on the held-out test set."
+Image("figures/residuals.png")
+```
+
+```{python}
+#| label: fig-feature-importance-reg
+#| fig-cap: "Random Forest feature importances (regression)."
+Image("figures/feature_importance_regression.png")
+```
+
+```{python}
+#| label: fig-shap-reg
+#| fig-cap: "SHAP summary (regression)."
+Image("figures/shap_summary_regression.png")
+```
+
+The regression result is the most important honest finding in this report. With
+MAE = `{python} f"{reg_metrics['mae']:.2f}"` minutes and **R² =
+`{python} f"{reg_metrics['r2']:.3f}"`**, the model explains only a small fraction of the
+variation in actual consultation duration. @fig-residuals shows why: predictions compress
+into a narrow ~11–24 minute band, while actual durations range from 3 to nearly 58 minutes.
+Genuinely long consultations are systematically **underestimated** by as much as 40
+minutes. The same two features — `Visit.No` and `IsRepeatVisit` — again dominate feature
+importance.
+
+## Discussion
+
+**What the models tell us for TDABC.** The feature-importance results are, in themselves,
+a substantive finding for the costing question this project supports: **consultation
+duration at this clinic is driven primarily by how many times a patient has visited
+before, not by diagnosis severity or scheduling context.** For TDABC purposes, this
+suggests that a capacity cost rate built primarily around visit-history segments (new vs.
+returning patients) would capture more of the real cost-driving variation than one built
+around calendar or diagnosis segments — though the low R² means any such rate should be
+treated as a rough planning input, not a precise per-visit cost estimate.
+
+**Why the regression ceiling is low.** The available predictors are exclusively
+scheduling and demographic fields; none describe the clinical complexity of a given visit
+(e.g. number of concerns raised, treatment changes, complexity of the case). It is
+plausible — expected, even — that the majority of variation in a doctor-patient
+consultation's length is driven by exactly this kind of clinical content, which this
+dataset does not capture. The honest conclusion is that scheduling metadata alone is
+insufficient to predict consultation duration precisely; it can only nudge a scheduling
+system's expectations in the right direction on average.
+
+**Limitations.**
+
+- Data comes from a single clinic over 2018–2019; results may not generalise to other
+  clinics, specialties, or time periods.
+- `S.Cancer` is rare enough (~1% positive) that its individual contribution is hard to
+  estimate reliably.
+- 33 patients have an inconsistent `M.Cancer` flag across visits, left uncorrected by
+  design (see @sec-feature-selection discussion) — a source of label noise the models
+  must absorb.
+- Predictions are estimates intended to support scheduling and cost-driver planning; they
+  are not, and are not intended to be, clinical guidance.
+
+## Conclusion
+
+This project delivers two fully reproducible, leakage-audited models trained on the Hangu
+outpatient oncology clinic dataset, served through a documented REST API and an
+interactive web dashboard. The classification model achieves modest but genuine
+discriminative power (ROC-AUC `{python} f"{clf_metrics['roc_auc']:.3f}"`); the regression
+model, while limited in explanatory power (R²
+`{python} f"{reg_metrics['r2']:.3f}"`), surfaces a clear and actionable finding: **patient
+visit history, far more than diagnosis or calendar context, drives consultation duration
+at this clinic.** For the TDABC application motivating this work, that finding — not the
+raw predictive accuracy — is the most useful output: it points toward visit-history-based
+segmentation as the more promising basis for estimating outpatient time-driven cost rates.
+
+## Reproducibility
+
+- Random seed fixed at `{python} metadata["random_state"]` throughout.
+- Library versions: Python `{python} metadata["library_versions"]["python"]`, pandas
+  `{python} metadata["library_versions"]["pandas"]`, scikit-learn
+  `{python} metadata["library_versions"]["scikit_learn"]`.
+- Full pipeline: `ml/data` → `ml/preprocessing` → `ml/pipelines` → `ml/training` →
+  `ml/evaluation` → `ml/persistence`, each stage covered by its own automated test suite.
+
+## References
