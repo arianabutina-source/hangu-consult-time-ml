@@ -112,6 +112,12 @@ cd hangu-consult-time-ml
 pip install -r requirements.txt
 ```
 
+> **macOS only:** if importing `xgboost` fails with `Library not loaded: @rpath/libomp.dylib`,
+> install its OpenMP runtime once with `brew install libomp` (a system library, not a pip
+> package). This only affects retraining/tests, which import `xgboost` directly — the
+> Quarto report (D1) never imports it and renders fine without this step, since it only
+> reads already-committed metrics/figures from `ml/artifacts/` and `report/figures/`.
+
 ### Run the ML test suite
 
 ```bash
