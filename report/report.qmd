@@ -40,6 +40,8 @@ clf_metrics = load_json("test_metrics_classification.json")
 reg_metrics = load_json("test_metrics_regression.json")
 clf_tuning = load_json("tuning_results_classification.json")
 reg_tuning = load_json("tuning_results_regression.json")
+clf_leaderboard = load_json("test_leaderboard_classification.json")
+reg_leaderboard = load_json("test_leaderboard_regression.json")
 metadata = load_json("metadata.json")
 
 
@@ -53,6 +55,16 @@ def tuning_table(tuning: dict, score_label: str, negate: bool = False) -> pd.Dat
             score = -score
         rows.append({"Model": name.replace("_", " ").title(), score_label: round(score, 4)})
     return pd.DataFrame(rows).sort_values(score_label, ascending=not negate).reset_index(drop=True)
+
+
+def leaderboard_table(leaderboard: list[dict], columns: list[str]) -> pd.DataFrame:
+    rows = []
+    for row in leaderboard:
+        formatted = {"Model": row["model"].replace("_", " ").title()}
+        for col in columns:
+            formatted[col.upper() if col in ("mae", "rmse", "r2") else col.replace("_", " ").upper()] = round(row[col], 4)
+        rows.append(formatted)
+    return pd.DataFrame(rows)
 ```
 
 ## Introduction and Motivation
@@ -198,16 +210,24 @@ cross-validation fold use `StratifiedGroupKFold`, grouped by patient `ID` and st
 validation/test. The held-out test set is **5,309 train / 1,328 test rows** (≈80/20), with
 near-identical class balance on both sides (49.8% / 49.8%).
 
-**Model selection.** Three estimator families were compared per task via
-`RandomizedSearchCV` over the group-aware cross-validation: `LogisticRegression`/`Ridge`,
-`RandomForestClassifier`/`Regressor`, and `XGBClassifier`/`Regressor`. All estimators use a
-fixed random seed (`random_state=42`).
+**Model selection.** A full model ladder was compared per task via `RandomizedSearchCV`
+over the group-aware cross-validation: a naive `DummyClassifier`/`DummyRegressor`
+baseline, `LogisticRegression`/`Ridge`, `RandomForestClassifier`/`Regressor`, and
+`XGBClassifier`/`Regressor`. All estimators use a fixed random seed (`random_state=42`).
+The dummy baseline is never a selection candidate in any meaningful sense — it exists so
+every leaderboard below shows exactly how much the tuned models beat "guess from the
+label distribution alone."
 
 **Honest evaluation.** The selected model per task was refit once on the full training set
 and scored **exactly once** on the held-out test set. Those numbers — reported below — were
-never fed back into further tuning.
+never fed back into further tuning. The *same* held-out test set is also used to build a
+full leaderboard across every candidate in the ladder (including `dummy`), so the report
+shows both the single deployed model's metrics and how every alternative would have
+scored, not just the winner.
 
 ## Classification Results: Long vs. Short Consultation
+
+**Model selection (cross-validated on the training set only):**
 
 ```{python}
 #| label: tbl-clf-tuning
@@ -215,11 +235,28 @@ tuning_table(clf_tuning, "CV ROC-AUC")
 ```
 
 `{python} clf_tuning["best_model"].replace("_", " ").title()` was selected, narrowly
-outperforming the other two candidates — all three land within about 0.003 ROC-AUC of each
-other, suggesting the ceiling on predictive signal from this feature set is fairly firm
-regardless of model family.
+outperforming `logistic_regression` and `xgboost` — all three land within about 0.003
+ROC-AUC of each other, suggesting the ceiling on predictive signal from this feature set
+is fairly firm regardless of model family. The naive `dummy` baseline (predicting from
+the label distribution alone, no features) scores exactly 0.5 CV ROC-AUC, as it must by
+construction — included here as the floor every real candidate must clear.
 
-**Held-out test set (evaluated once):**
+**Full model-ladder leaderboard, held-out test set (each candidate refit on the full
+training set and scored exactly once — never re-tuned from these numbers):**
+
+```{python}
+#| label: tbl-clf-leaderboard
+leaderboard_table(clf_leaderboard, ["accuracy", "precision", "recall", "f1", "roc_auc"])
+```
+
+Every tuned model clears the `dummy` baseline by roughly 0.13 ROC-AUC — real, if modest,
+signal. `{python} clf_tuning["best_model"].replace("_", " ").title()` (selected by CV) is
+also the top scorer on this particular held-out test set, though by a margin (≤0.003
+ROC-AUC vs. the other tuned candidates) well within what could plausibly reverse on a
+different random split — consistent with the CV-stage finding that model family barely
+matters here.
+
+**Selected model's metrics in isolation** (the numbers used for the figures below):
 
 ```{python}
 #| label: tbl-clf-test
@@ -262,12 +299,37 @@ importance — far outweighing cancer-diagnosis flags or calendar features.
 
 ## Regression Results: Consultation Duration in Minutes
 
+**Model selection (cross-validated on the training set only):**
+
 ```{python}
 #| label: tbl-reg-tuning
 tuning_table(reg_tuning, "CV MAE (minutes)", negate=True)
 ```
 
-**Held-out test set (evaluated once):**
+`{python} reg_tuning["best_model"].replace("_", " ").title()` was selected by CV, with
+`dummy` (predicting the training-set mean/median regardless of features) trailing by
+about 0.15 minutes MAE — the real signal in this feature set is small in absolute terms.
+
+**Full model-ladder leaderboard, held-out test set:**
+
+```{python}
+#| label: tbl-reg-leaderboard
+leaderboard_table(reg_leaderboard, ["mae", "rmse", "r2"])
+```
+
+Two honest findings here. First, every tuned model clears `dummy` — whose test-set R² is
+**negative** (worse than always predicting the training mean), which is the expected,
+correct behaviour of a naive baseline evaluated out-of-sample, not a bug. Second,
+**`xgboost` edges out `{python} reg_tuning["best_model"].replace("_", " ").title()` on
+this particular held-out test set** (higher R², lower MAE and RMSE), even though CV
+selected Random Forest during model selection. This is not cherry-picked after the fact —
+Random Forest remains the deployed model, selected honestly *before* the test set was
+touched, and the gap between it and XGBoost here is well within the noise expected when
+three model families land this close in cross-validation. It is reported plainly because
+the alternative — quietly re-selecting whichever model wins on the test set — is exactly
+the kind of leakage this project is designed to avoid.
+
+**Selected model's metrics in isolation** (the numbers used for the figures below):
 
 ```{python}
 #| label: tbl-reg-test

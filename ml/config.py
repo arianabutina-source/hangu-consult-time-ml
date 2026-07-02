@@ -171,6 +171,13 @@ REGRESSION_TUNING_RESULTS_PATH: Path = ARTIFACTS_DIR / "tuning_results_regressio
 TEST_METRICS_CLASSIFICATION_PATH: Path = ARTIFACTS_DIR / "test_metrics_classification.json"
 TEST_METRICS_REGRESSION_PATH: Path = ARTIFACTS_DIR / "test_metrics_regression.json"
 
+# Full model-ladder comparison (incl. the Dummy baseline), each candidate
+# refit on the full training set and scored on the held-out test set --
+# distinct from CLASSIFICATION_TUNING_RESULTS_PATH, which holds CV-only
+# scores used purely for model *selection*, never for reporting.
+TEST_LEADERBOARD_CLASSIFICATION_PATH: Path = ARTIFACTS_DIR / "test_leaderboard_classification.json"
+TEST_LEADERBOARD_REGRESSION_PATH: Path = ARTIFACTS_DIR / "test_leaderboard_regression.json"
+
 CONFUSION_MATRIX_FIGURE_PATH: Path = REPORT_FIGURES_DIR / "confusion_matrix.png"
 ROC_CURVE_FIGURE_PATH: Path = REPORT_FIGURES_DIR / "roc_curve.png"
 RESIDUALS_FIGURE_PATH: Path = REPORT_FIGURES_DIR / "residuals.png"

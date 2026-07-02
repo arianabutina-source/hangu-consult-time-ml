@@ -23,8 +23,10 @@ from ml.config import (
     CLASSIFICATION_TUNING_RESULTS_PATH,
     CONFUSION_MATRIX_FIGURE_PATH,
     ROC_CURVE_FIGURE_PATH,
+    TEST_LEADERBOARD_CLASSIFICATION_PATH,
     TEST_METRICS_CLASSIFICATION_PATH,
 )
+from ml.evaluation.leaderboard import build_test_leaderboard, save_leaderboard, sort_leaderboard
 from ml.evaluation.metrics import classification_metrics, save_metrics
 from ml.pipelines.classification_pipeline import build_classification_pipeline
 from ml.training.search import build_best_pipeline_from_results, load_tuning_results
@@ -116,12 +118,40 @@ def evaluate_classifier_on_test_set(
     return metrics
 
 
+def build_classification_test_leaderboard(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    tuning_results_path: Path = CLASSIFICATION_TUNING_RESULTS_PATH,
+) -> list[dict[str, float]]:
+    """Refit every candidate in ``CLASSIFICATION_MODELS`` (incl. ``dummy``) on
+    the full training set and score all of them on the held-out test set,
+    sorted best-first by ROC-AUC.
+    """
+    tuning_results = load_tuning_results(tuning_results_path)
+    leaderboard = build_test_leaderboard(
+        tuning_results,
+        CLASSIFICATION_MODELS,
+        build_classification_pipeline,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        classification_metrics,
+        use_predict_proba=True,
+    )
+    return sort_leaderboard(leaderboard, "roc_auc", higher_is_better=True)
+
+
 def run_classification_evaluation() -> tuple[Pipeline, dict[str, float]]:
     """Fit the tuned classification pipeline on the full training set and
-    evaluate it once on the held-out test set.
+    evaluate it once on the held-out test set. Also builds and saves the
+    full model-ladder leaderboard (incl. the ``dummy`` baseline) on the
+    same held-out test set.
 
     Returns:
-        ``(fitted_pipeline, test_metrics)``.
+        ``(fitted_pipeline, test_metrics)`` for the single best model.
     """
     from ml.data.feature_selection import select_classification_data
     from ml.data.split import get_train_test_split
@@ -136,6 +166,10 @@ def run_classification_evaluation() -> tuple[Pipeline, dict[str, float]]:
     metrics = evaluate_classifier_on_test_set(pipeline, X_test, y_test)
     save_metrics(metrics, TEST_METRICS_CLASSIFICATION_PATH)
     logger.info("Held-out classification test metrics: %s", metrics)
+
+    leaderboard = build_classification_test_leaderboard(X_train, y_train, X_test, y_test)
+    save_leaderboard(leaderboard, TEST_LEADERBOARD_CLASSIFICATION_PATH)
+
     return pipeline, metrics
 
 

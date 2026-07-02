@@ -1,4 +1,10 @@
 {
+  "dummy": {
+    "best_score": 0.5,
+    "best_params": {
+      "model__strategy": "most_frequent"
+    }
+  },
   "logistic_regression": {
     "best_score": 0.638086635064185,
     "best_params": {

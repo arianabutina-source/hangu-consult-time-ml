@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from scipy.stats import loguniform, randint, uniform
+from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, Ridge
 from xgboost import XGBClassifier, XGBRegressor
@@ -18,6 +19,14 @@ from xgboost import XGBClassifier, XGBRegressor
 from ml.config import RANDOM_STATE
 
 CLASSIFICATION_MODELS: dict[str, dict[str, Any]] = {
+    # Naive baseline: every leaderboard must show how much the tuned models
+    # actually beat "predict from the label distribution alone."
+    "dummy": {
+        "estimator": DummyClassifier(random_state=RANDOM_STATE),
+        "param_distributions": {
+            "model__strategy": ["most_frequent", "stratified", "prior"],
+        },
+    },
     "logistic_regression": {
         "estimator": LogisticRegression(random_state=RANDOM_STATE, max_iter=1000),
         "param_distributions": {
@@ -48,6 +57,12 @@ CLASSIFICATION_MODELS: dict[str, dict[str, Any]] = {
 }
 
 REGRESSION_MODELS: dict[str, dict[str, Any]] = {
+    "dummy": {
+        "estimator": DummyRegressor(),
+        "param_distributions": {
+            "model__strategy": ["mean", "median"],
+        },
+    },
     "ridge": {
         "estimator": Ridge(random_state=RANDOM_STATE),
         "param_distributions": {

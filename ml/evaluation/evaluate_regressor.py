@@ -19,8 +19,10 @@ from sklearn.pipeline import Pipeline
 from ml.config import (
     REGRESSION_TUNING_RESULTS_PATH,
     RESIDUALS_FIGURE_PATH,
+    TEST_LEADERBOARD_REGRESSION_PATH,
     TEST_METRICS_REGRESSION_PATH,
 )
+from ml.evaluation.leaderboard import build_test_leaderboard, save_leaderboard, sort_leaderboard
 from ml.evaluation.metrics import regression_metrics, save_metrics
 from ml.pipelines.regression_pipeline import build_regression_pipeline
 from ml.training.search import build_best_pipeline_from_results, load_tuning_results
@@ -79,12 +81,40 @@ def evaluate_regressor_on_test_set(
     return metrics
 
 
+def build_regression_test_leaderboard(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    tuning_results_path: Path = REGRESSION_TUNING_RESULTS_PATH,
+) -> list[dict[str, float]]:
+    """Refit every candidate in ``REGRESSION_MODELS`` (incl. ``dummy``) on the
+    full training set and score all of them on the held-out test set,
+    sorted best-first by R^2.
+    """
+    tuning_results = load_tuning_results(tuning_results_path)
+    leaderboard = build_test_leaderboard(
+        tuning_results,
+        REGRESSION_MODELS,
+        build_regression_pipeline,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        regression_metrics,
+        use_predict_proba=False,
+    )
+    return sort_leaderboard(leaderboard, "r2", higher_is_better=True)
+
+
 def run_regression_evaluation() -> tuple[Pipeline, dict[str, float]]:
     """Fit the tuned regression pipeline on the full training set and
-    evaluate it once on the held-out test set.
+    evaluate it once on the held-out test set. Also builds and saves the
+    full model-ladder leaderboard (incl. the ``dummy`` baseline) on the
+    same held-out test set.
 
     Returns:
-        ``(fitted_pipeline, test_metrics)``.
+        ``(fitted_pipeline, test_metrics)`` for the single best model.
     """
     from ml.data.feature_selection import select_regression_data
     from ml.data.split import get_train_test_split
@@ -99,6 +129,10 @@ def run_regression_evaluation() -> tuple[Pipeline, dict[str, float]]:
     metrics = evaluate_regressor_on_test_set(pipeline, X_test, y_test)
     save_metrics(metrics, TEST_METRICS_REGRESSION_PATH)
     logger.info("Held-out regression test metrics: %s", metrics)
+
+    leaderboard = build_regression_test_leaderboard(X_train, y_train, X_test, y_test)
+    save_leaderboard(leaderboard, TEST_LEADERBOARD_REGRESSION_PATH)
+
     return pipeline, metrics
 
 

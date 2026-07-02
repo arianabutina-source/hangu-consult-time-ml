@@ -1,4 +1,10 @@
 {
+  "dummy": {
+    "best_score": -4.536125384440989,
+    "best_params": {
+      "model__strategy": "median"
+    }
+  },
   "ridge": {
     "best_score": -4.389818180650597,
     "best_params": {

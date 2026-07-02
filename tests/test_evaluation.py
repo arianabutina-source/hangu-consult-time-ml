@@ -19,6 +19,7 @@ from ml.data.features import engineer_features
 from ml.data.load import load_raw_data
 from ml.data.split import grouped_stratified_split
 from ml.evaluation.evaluate_classifier import (
+    build_classification_test_leaderboard,
     build_tuned_classification_pipeline,
     evaluate_classifier_on_test_set,
     plot_confusion_matrix,
@@ -26,15 +27,23 @@ from ml.evaluation.evaluate_classifier import (
     run_classification_evaluation,
 )
 from ml.evaluation.evaluate_regressor import (
+    build_regression_test_leaderboard,
     build_tuned_regression_pipeline,
     evaluate_regressor_on_test_set,
     plot_residuals,
     run_regression_evaluation,
 )
+from ml.evaluation.leaderboard import (
+    build_test_leaderboard,
+    load_leaderboard,
+    save_leaderboard,
+    sort_leaderboard,
+)
 from ml.evaluation.metrics import classification_metrics, regression_metrics, save_metrics
 from ml.pipelines.classification_pipeline import build_classification_pipeline
 from ml.pipelines.regression_pipeline import build_regression_pipeline
 from ml.training.search import build_best_pipeline_from_results
+from ml.training.tuning_spaces import CLASSIFICATION_MODELS, REGRESSION_MODELS
 
 
 @pytest.fixture(scope="module")
@@ -221,3 +230,113 @@ def test_run_classification_evaluation_end_to_end() -> None:
 def test_run_regression_evaluation_end_to_end() -> None:
     _, metrics = run_regression_evaluation()
     assert metrics["mae"] > 0.0
+
+
+# --------------------------------------------------------------------------- #
+# Full model-ladder leaderboard on the held-out test set (incl. the "dummy"
+# baseline), distinct from the CV-only tuning-results comparison above.
+# --------------------------------------------------------------------------- #
+def test_build_test_leaderboard_scores_every_candidate() -> None:
+    rng = np.random.default_rng(0)
+    X_train = pd.DataFrame({"numeric__x": rng.normal(size=200)})
+    y_train = pd.Series(rng.integers(0, 2, size=200))
+    X_test = pd.DataFrame({"numeric__x": rng.normal(size=50)})
+    y_test = pd.Series(rng.integers(0, 2, size=50))
+
+    fake_models = {
+        "dummy": {"estimator": LogisticRegression(max_iter=1000)},
+        "logistic_regression": {"estimator": LogisticRegression(max_iter=1000)},
+    }
+    fake_results = {
+        "dummy": {"best_score": 0.5, "best_params": {"model__C": 1.0}},
+        "logistic_regression": {"best_score": 0.6, "best_params": {"model__C": 2.0}},
+        "best_model": "logistic_regression",
+    }
+
+    def identity_pipeline_builder(estimator):
+        from sklearn.pipeline import Pipeline
+
+        return Pipeline(steps=[("model", estimator)])
+
+    leaderboard = build_test_leaderboard(
+        fake_results,
+        fake_models,
+        identity_pipeline_builder,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        classification_metrics,
+        use_predict_proba=True,
+    )
+
+    assert len(leaderboard) == 2
+    assert {row["model"] for row in leaderboard} == {"dummy", "logistic_regression"}
+    for row in leaderboard:
+        assert 0.0 <= row["roc_auc"] <= 1.0
+    # "best_model" bookkeeping key must never leak into the scored rows.
+    assert all("best_model" not in row for row in leaderboard)
+
+
+def test_sort_leaderboard_orders_best_first() -> None:
+    leaderboard = [
+        {"model": "a", "roc_auc": 0.6},
+        {"model": "b", "roc_auc": 0.9},
+        {"model": "c", "roc_auc": 0.5},
+    ]
+    sorted_board = sort_leaderboard(leaderboard, "roc_auc", higher_is_better=True)
+    assert [row["model"] for row in sorted_board] == ["b", "a", "c"]
+
+    ascending_board = sort_leaderboard(leaderboard, "roc_auc", higher_is_better=False)
+    assert [row["model"] for row in ascending_board] == ["c", "a", "b"]
+
+
+def test_save_and_load_leaderboard_round_trip(tmp_path: Path) -> None:
+    leaderboard = [{"model": "dummy", "roc_auc": 0.5}, {"model": "random_forest", "roc_auc": 0.63}]
+    path = tmp_path / "leaderboard.json"
+    save_leaderboard(leaderboard, path)
+    assert load_leaderboard(path) == leaderboard
+
+
+@pytest.mark.skipif(
+    not CLASSIFICATION_TUNING_RESULTS_PATH.exists(), reason="tuning results not yet generated"
+)
+def test_classification_leaderboard_includes_dummy_baseline(
+    train_test_split_df: tuple[pd.DataFrame, pd.DataFrame],
+) -> None:
+    train_df, test_df = train_test_split_df
+    X_train, y_train = select_classification_data(train_df)
+    X_test, y_test = select_classification_data(test_df)
+
+    leaderboard = build_classification_test_leaderboard(X_train, y_train, X_test, y_test)
+
+    assert len(leaderboard) == len(CLASSIFICATION_MODELS)
+    model_names = {row["model"] for row in leaderboard}
+    assert "dummy" in model_names
+    assert {"logistic_regression", "random_forest", "xgboost"} <= model_names
+    for row in leaderboard:
+        assert 0.0 <= row["roc_auc"] <= 1.0
+    # Leaderboard is sorted best-first by ROC-AUC.
+    scores = [row["roc_auc"] for row in leaderboard]
+    assert scores == sorted(scores, reverse=True)
+
+
+@pytest.mark.skipif(
+    not REGRESSION_TUNING_RESULTS_PATH.exists(), reason="tuning results not yet generated"
+)
+def test_regression_leaderboard_includes_dummy_baseline(
+    train_test_split_df: tuple[pd.DataFrame, pd.DataFrame],
+) -> None:
+    train_df, test_df = train_test_split_df
+    X_train, y_train = select_regression_data(train_df)
+    X_test, y_test = select_regression_data(test_df)
+
+    leaderboard = build_regression_test_leaderboard(X_train, y_train, X_test, y_test)
+
+    assert len(leaderboard) == len(REGRESSION_MODELS)
+    model_names = {row["model"] for row in leaderboard}
+    assert "dummy" in model_names
+    assert {"ridge", "random_forest", "xgboost"} <= model_names
+    # Leaderboard is sorted best-first by R^2.
+    scores = [row["r2"] for row in leaderboard]
+    assert scores == sorted(scores, reverse=True)
