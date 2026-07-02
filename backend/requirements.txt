@@ -7,9 +7,13 @@ numpy==2.4.6
 scikit-learn==1.9.0
 joblib==1.5.3
 
-# xgboost is intentionally NOT included: the currently serialized pipelines
-# (ml/artifacts/*.joblib) use RandomForest, not XGBoost (see metadata.json's
-# "best_model"). xgboost's Linux wheel pulls in a ~300MB CUDA dependency
-# (nvidia-nccl-cu12) even for CPU-only use, which needlessly triples the
-# deployed image size. If a future retrain selects an XGBoost model as best,
-# add `xgboost==3.3.0` back here before deploying that version.
+# xgboost is required again: the API now loads the *entire* model ladder
+# (ml/artifacts/models/{classification,regression}/*.joblib) to show every
+# model's prediction side by side, not just the deployed RandomForest
+# pipeline -- and one ladder entry per task is an XGBClassifier/Regressor.
+# Unpickling those .joblib files fails at startup without this installed,
+# even though RandomForest remains the single "deployed" model. This does
+# reintroduce xgboost's ~300MB CUDA dependency (nvidia-nccl-cu12) into the
+# image, which was previously avoided -- an accepted tradeoff for showing
+# real XGBoost predictions in the app.
+xgboost==3.3.0

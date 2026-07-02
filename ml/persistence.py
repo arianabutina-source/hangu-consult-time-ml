@@ -61,11 +61,12 @@ def get_git_commit_hash(repo_dir: Path = PROJECT_ROOT) -> str | None:
 def get_library_versions() -> dict[str, str]:
     """Snapshot the versions of every library that affects reproducibility.
 
-    ``xgboost`` is imported lazily and optionally: it is a training-only
-    dependency (see ``ml.training.tuning_spaces``), not required to load or
-    serve a pipeline, so environments that only run inference (e.g. the
-    deployed FastAPI backend) need not install it. Reported as ``None`` if
-    unavailable rather than raising.
+    ``xgboost`` is imported lazily here so this function still degrades
+    gracefully (reports ``None`` instead of raising) in any environment
+    that genuinely lacks it -- but note the deployed FastAPI backend *does*
+    require it at runtime now: it loads every model in the ladder
+    (``ml.training.tuning_spaces``) for side-by-side predictions, including
+    an XGBClassifier/Regressor, not just the deployed RandomForest pipeline.
     """
     try:
         import xgboost
