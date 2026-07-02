@@ -5,7 +5,8 @@ import { Logo } from "./Logo";
 const links = [
   { to: "/", label: "Home" },
   { to: "/dashboard", label: "Appointment Length Calculator" },
-  { to: "/predict/classification", label: "Live Prediction" },
+  { to: "/predict/classification", label: "Long Visit Predictor" },
+  { to: "/predict/regression", label: "Duration Estimate" },
   { to: "/scheduling-script", label: "Scheduling Script" },
   { to: "/pricelist", label: "Pricelist" },
   { to: "/team", label: "Team" },

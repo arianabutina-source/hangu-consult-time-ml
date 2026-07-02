@@ -202,8 +202,10 @@ export function DashboardPage() {
                 data via a scikit-learn ColumnTransformer.
               </li>
               <li>
-                Logistic Regression / Ridge, Random Forest, and XGBoost were compared via
-                randomized hyperparameter search; Random Forest was selected for both tasks.
+                A Dummy baseline, Logistic Regression / Ridge, a Decision Tree, Random Forest,
+                and XGBoost were compared via randomized hyperparameter search; Random Forest
+                was selected for both tasks. Try the Live Prediction pages to see every
+                model's prediction side by side.
               </li>
               <li>The held-out test set was evaluated exactly once, after model selection.</li>
             </ul>

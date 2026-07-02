@@ -204,3 +204,11 @@ SHAP_MAX_SAMPLES: int = 200
 CLASSIFIER_PIPELINE_PATH: Path = ARTIFACTS_DIR / "classifier_pipeline.joblib"
 REGRESSOR_PIPELINE_PATH: Path = ARTIFACTS_DIR / "regressor_pipeline.joblib"
 METADATA_PATH: Path = ARTIFACTS_DIR / "metadata.json"
+
+# Every tuned candidate in the model ladder (not just the CV-selected
+# winner above) is also persisted individually, so the API/frontend can
+# show every model's prediction side by side -- see
+# scripts/export_all_models.py. Filenames are the model-ladder keys, e.g.
+# "dummy.joblib", "random_forest.joblib".
+CLASSIFICATION_MODELS_DIR: Path = ARTIFACTS_DIR / "models" / "classification"
+REGRESSION_MODELS_DIR: Path = ARTIFACTS_DIR / "models" / "regression"

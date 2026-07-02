@@ -24,7 +24,12 @@ Both predict endpoints take the same request body — the *raw*, clinic-facing f
 (`IsRepeatVisit`, `IsPublicHolidayMakeup`, `HasCancerDiagnosis`) are derived server-side
 using the exact same functions applied during training — callers never compute them.
 
-Example request:
+Each response scores the request against **every model in the ladder** (`dummy`,
+`logistic_regression`/`ridge`, `decision_tree`, `random_forest`, `xgboost`), not just the
+deployed one — `best_model` names which entry in `predictions` is the CV-selected,
+production model.
+
+Example request/response:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/predict/classification \
@@ -42,6 +47,22 @@ curl -X POST http://localhost:8000/api/v1/predict/classification \
   }'
 ```
 
+```json
+{
+  "best_model": "random_forest",
+  "predictions": [
+    {"model": "dummy", "is_long_consultation": false, "probability_long": 0.0, "probability_short": 1.0},
+    {"model": "logistic_regression", "is_long_consultation": true, "probability_long": 0.601, "probability_short": 0.399},
+    {"model": "decision_tree", "is_long_consultation": true, "probability_long": 0.540, "probability_short": 0.460},
+    {"model": "random_forest", "is_long_consultation": true, "probability_long": 0.566, "probability_short": 0.434},
+    {"model": "xgboost", "is_long_consultation": true, "probability_long": 0.531, "probability_short": 0.469}
+  ]
+}
+```
+
+`/predict/regression` mirrors this shape with `predicted_duration_minutes` in place of the
+three classification fields.
+
 ## Setup
 
 ```bash
@@ -51,9 +72,13 @@ cd ..
 uvicorn backend.app.main:app --reload
 ```
 
-Requires `ml/artifacts/classifier_pipeline.joblib` and `regressor_pipeline.joblib` to
-exist — run `python -m scripts.export_metadata` from the repo root first if they don't
-(see the root [README](../README.md)).
+Requires two sets of artifacts under `ml/artifacts/` to exist — run both from the repo
+root if they don't (see the root [README](../README.md)):
+
+```bash
+python -m scripts.export_metadata      # classifier_pipeline.joblib, regressor_pipeline.joblib, metadata.json
+python -m scripts.export_all_models    # models/classification/*.joblib, models/regression/*.joblib (the full ladder)
+```
 
 ## Environment Variables
 
@@ -63,8 +88,11 @@ See [`.env.example`](.env.example):
 |---|---|---|
 | `ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated CORS allow-list |
 | `LOG_LEVEL` | `INFO` | Python logging level |
-| `CLASSIFIER_PIPELINE_PATH` | `ml/artifacts/classifier_pipeline.joblib` | Override the classifier artifact path |
-| `REGRESSOR_PIPELINE_PATH` | `ml/artifacts/regressor_pipeline.joblib` | Override the regressor artifact path |
+| `CLASSIFIER_PIPELINE_PATH` | `ml/artifacts/classifier_pipeline.joblib` | Override the deployed classifier artifact path |
+| `REGRESSOR_PIPELINE_PATH` | `ml/artifacts/regressor_pipeline.joblib` | Override the deployed regressor artifact path |
+| `METADATA_PATH` | `ml/artifacts/metadata.json` | Override the metadata path (used to identify `best_model`) |
+| `CLASSIFICATION_MODELS_DIR` | `ml/artifacts/models/classification` | Override the classification model-ladder directory |
+| `REGRESSION_MODELS_DIR` | `ml/artifacts/models/regression` | Override the regression model-ladder directory |
 
 ## Tests
 

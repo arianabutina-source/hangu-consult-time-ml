@@ -16,9 +16,9 @@ from ml.data.features import (
     add_repeat_visit_flag,
 )
 
-from backend.app.schemas.classification import ClassificationOutput
+from backend.app.schemas.classification import ClassificationModelPrediction, ClassificationOutput
 from backend.app.schemas.common import ConsultationInput
-from backend.app.schemas.regression import RegressionOutput
+from backend.app.schemas.regression import RegressionModelPrediction, RegressionOutput
 
 
 def build_feature_frame(payload: ConsultationInput) -> pd.DataFrame:
@@ -42,22 +42,48 @@ def build_feature_frame(payload: ConsultationInput) -> pd.DataFrame:
     return frame
 
 
-def predict_classification(pipeline: Pipeline, payload: ConsultationInput) -> ClassificationOutput:
-    """Run the classification pipeline on a single request payload."""
-    frame = build_feature_frame(payload)
+def _predict_one_classifier(
+    pipeline: Pipeline, model_name: str, frame: pd.DataFrame
+) -> ClassificationModelPrediction:
     is_long = bool(pipeline.predict(frame)[0])
     probability_short, probability_long = pipeline.predict_proba(frame)[0]
-    return ClassificationOutput(
+    return ClassificationModelPrediction(
+        model=model_name,
         is_long_consultation=is_long,
         probability_long=float(probability_long),
         probability_short=float(probability_short),
     )
 
 
-def predict_regression(pipeline: Pipeline, payload: ConsultationInput) -> RegressionOutput:
-    """Run the regression pipeline on a single request payload."""
+def predict_classification(
+    classifiers: dict[str, Pipeline], best_model: str, payload: ConsultationInput
+) -> ClassificationOutput:
+    """Run every classifier in the model ladder on a single request payload."""
     frame = build_feature_frame(payload)
+    predictions = [
+        _predict_one_classifier(pipeline, name, frame) for name, pipeline in classifiers.items()
+    ]
+    return ClassificationOutput(best_model=best_model, predictions=predictions)
+
+
+def _predict_one_regressor(
+    pipeline: Pipeline, model_name: str, frame: pd.DataFrame
+) -> RegressionModelPrediction:
     predicted_minutes = float(pipeline.predict(frame)[0])
     # Duration cannot be negative; clip at the API boundary only (the model
-    # itself is never modified).
-    return RegressionOutput(predicted_duration_minutes=max(predicted_minutes, 0.0))
+    # itself is never modified). A linear model (ridge) in particular can
+    # predict a negative value for some inputs.
+    return RegressionModelPrediction(
+        model=model_name, predicted_duration_minutes=max(predicted_minutes, 0.0)
+    )
+
+
+def predict_regression(
+    regressors: dict[str, Pipeline], best_model: str, payload: ConsultationInput
+) -> RegressionOutput:
+    """Run every regressor in the model ladder on a single request payload."""
+    frame = build_feature_frame(payload)
+    predictions = [
+        _predict_one_regressor(pipeline, name, frame) for name, pipeline in regressors.items()
+    ]
+    return RegressionOutput(best_model=best_model, predictions=predictions)

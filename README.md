@@ -152,7 +152,8 @@ python -m ml.training.train_regressor      # tunes + saves regression tuning res
 python -m ml.evaluation.evaluate_classifier # one-time honest test-set evaluation
 python -m ml.evaluation.evaluate_regressor
 python -m ml.evaluation.explainability      # feature importance + SHAP figures
-python -m scripts.export_metadata           # serializes final models + metadata.json
+python -m scripts.export_metadata           # serializes the deployed models + metadata.json
+python -m scripts.export_all_models         # serializes every model in the ladder (backend needs this too)
 python -m scripts.export_dashboard_data     # exports JSON the frontend dashboard reads
 ```
 

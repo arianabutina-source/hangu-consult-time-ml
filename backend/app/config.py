@@ -23,6 +23,13 @@ class Settings(BaseSettings):
 
     classifier_pipeline_path: Path = _DEFAULT_ARTIFACTS_DIR / "classifier_pipeline.joblib"
     regressor_pipeline_path: Path = _DEFAULT_ARTIFACTS_DIR / "regressor_pipeline.joblib"
+    metadata_path: Path = _DEFAULT_ARTIFACTS_DIR / "metadata.json"
+
+    # Every tuned candidate in the model ladder (dummy, linear, decision
+    # tree, random forest, xgboost), one .joblib file per model -- see
+    # scripts/export_all_models.py.
+    classification_models_dir: Path = _DEFAULT_ARTIFACTS_DIR / "models" / "classification"
+    regression_models_dir: Path = _DEFAULT_ARTIFACTS_DIR / "models" / "regression"
 
     # Comma-separated list of origins allowed to call this API (the deployed
     # Vercel frontend URL, plus localhost during development).

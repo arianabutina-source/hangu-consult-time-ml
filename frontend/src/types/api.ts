@@ -47,10 +47,52 @@ export interface ConsultationInput {
   address: Address;
 }
 
-export interface ClassificationOutput {
+export interface ClassificationModelPrediction {
+  model: string;
   is_long_consultation: boolean;
   probability_long: number;
   probability_short: number;
+}
+
+export interface ClassificationOutput {
+  best_model: string;
+  predictions: ClassificationModelPrediction[];
+}
+
+export interface RegressionModelPrediction {
+  model: string;
+  predicted_duration_minutes: number;
+}
+
+export interface RegressionOutput {
+  best_model: string;
+  predictions: RegressionModelPrediction[];
+}
+
+/** Human-readable labels for model-ladder keys returned by the API. */
+export const MODEL_LABELS: Record<string, string> = {
+  dummy: "Baseline (Dummy)",
+  logistic_regression: "Logistic Regression",
+  ridge: "Ridge Regression",
+  decision_tree: "Decision Tree",
+  random_forest: "Random Forest",
+  xgboost: "XGBoost",
+};
+
+/** Baseline -> linear -> single tree -> ensembles: simplest model first. */
+const MODEL_DISPLAY_ORDER = [
+  "dummy",
+  "logistic_regression",
+  "ridge",
+  "decision_tree",
+  "random_forest",
+  "xgboost",
+];
+
+export function sortByModelOrder<T extends { model: string }>(rows: T[]): T[] {
+  return [...rows].sort(
+    (a, b) => MODEL_DISPLAY_ORDER.indexOf(a.model) - MODEL_DISPLAY_ORDER.indexOf(b.model),
+  );
 }
 
 /** Shape of a FastAPI validation error response (HTTP 422). */

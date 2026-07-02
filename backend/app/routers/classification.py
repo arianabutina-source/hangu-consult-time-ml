@@ -21,4 +21,4 @@ router = APIRouter(prefix="/api/v1", tags=["classification"])
 def predict_classification_endpoint(
     payload: ConsultationInput, registry: ModelRegistry = Depends(get_model_registry)
 ) -> ClassificationOutput:
-    return predict_classification(registry.classifier, payload)
+    return predict_classification(registry.classifiers, registry.best_classifier_name, payload)

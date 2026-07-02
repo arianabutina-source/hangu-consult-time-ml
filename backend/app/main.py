@@ -22,7 +22,11 @@ from backend.app.services.model_registry import ModelRegistry
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     app.state.model_registry = ModelRegistry.load(
-        settings.classifier_pipeline_path, settings.regressor_pipeline_path
+        settings.classifier_pipeline_path,
+        settings.regressor_pipeline_path,
+        settings.classification_models_dir,
+        settings.regression_models_dir,
+        settings.metadata_path,
     )
     yield
 

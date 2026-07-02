@@ -10,9 +10,17 @@ def test_predict_regression_returns_valid_response(
     assert response.status_code == 200
 
     body = response.json()
-    assert set(body.keys()) == {"predicted_duration_minutes"}
-    assert body["predicted_duration_minutes"] >= 0.0
-    assert body["predicted_duration_minutes"] < 120.0  # plausible upper bound
+    assert set(body.keys()) == {"best_model", "predictions"}
+    assert isinstance(body["best_model"], str)
+
+    model_names = {row["model"] for row in body["predictions"]}
+    assert body["best_model"] in model_names
+    assert {"dummy", "ridge", "decision_tree", "random_forest", "xgboost"} == model_names
+
+    for row in body["predictions"]:
+        assert set(row.keys()) == {"model", "predicted_duration_minutes"}
+        assert row["predicted_duration_minutes"] >= 0.0
+        assert row["predicted_duration_minutes"] < 120.0  # plausible upper bound
 
 
 def test_predict_regression_rejects_non_positive_visit_number(

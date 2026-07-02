@@ -4,7 +4,8 @@ import { Logo } from "./Logo";
 const pages = [
   { to: "/", label: "Home" },
   { to: "/dashboard", label: "Model Results" },
-  { to: "/predict/classification", label: "Live Prediction" },
+  { to: "/predict/classification", label: "Long Visit Predictor" },
+  { to: "/predict/regression", label: "Duration Estimate" },
   { to: "/scheduling-script", label: "Scheduling Script" },
   { to: "/pricelist", label: "Pricelist" },
   { to: "/team", label: "Team" },
@@ -12,7 +13,7 @@ const pages = [
 
 const stack = [
   "FastAPI + scikit-learn backend",
-  "Random Forest classification & regression",
+  "Dummy, Logistic/Ridge, Decision Tree, Random Forest & XGBoost compared live",
   "Grouped, leakage-safe cross-validation",
   "Vite + React + Recharts",
 ];

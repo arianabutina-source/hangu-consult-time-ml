@@ -11,11 +11,28 @@ def test_predict_classification_returns_valid_response(
     assert response.status_code == 200
 
     body = response.json()
-    assert set(body.keys()) == {"is_long_consultation", "probability_long", "probability_short"}
-    assert isinstance(body["is_long_consultation"], bool)
-    assert 0.0 <= body["probability_long"] <= 1.0
-    assert 0.0 <= body["probability_short"] <= 1.0
-    assert body["probability_long"] + body["probability_short"] == pytest.approx(1.0, abs=1e-6)
+    assert set(body.keys()) == {"best_model", "predictions"}
+    assert isinstance(body["best_model"], str)
+
+    model_names = {row["model"] for row in body["predictions"]}
+    assert body["best_model"] in model_names
+    assert {"dummy", "logistic_regression", "decision_tree", "random_forest", "xgboost"} == (
+        model_names
+    )
+
+    for row in body["predictions"]:
+        assert set(row.keys()) == {
+            "model",
+            "is_long_consultation",
+            "probability_long",
+            "probability_short",
+        }
+        assert isinstance(row["is_long_consultation"], bool)
+        assert 0.0 <= row["probability_long"] <= 1.0
+        assert 0.0 <= row["probability_short"] <= 1.0
+        assert row["probability_long"] + row["probability_short"] == pytest.approx(
+            1.0, abs=1e-6
+        )
 
 
 def test_predict_classification_rejects_non_positive_visit_number(

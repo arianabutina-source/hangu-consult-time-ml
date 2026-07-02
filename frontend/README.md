@@ -10,7 +10,8 @@ backend via `fetch()`; the dashboard's charts read static JSON exported by
 |---|---|
 | `/` | Home — motivation, hero, benefits |
 | `/dashboard` | "Appointment Length Calculator" — model performance, results, feature importance |
-| `/predict/classification` | Live prediction form (long vs. short consultation) |
+| `/predict/classification` | Live prediction form (long vs. short consultation) — shows every model's prediction |
+| `/predict/regression` | Live duration-estimate form (minutes) — shows every model's prediction |
 | `/scheduling-script` | Patient communication script |
 | `/pricelist` | Service pricing tables |
 | `/team` | Clinic team |

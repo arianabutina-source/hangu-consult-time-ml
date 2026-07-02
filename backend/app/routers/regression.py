@@ -21,4 +21,4 @@ router = APIRouter(prefix="/api/v1", tags=["regression"])
 def predict_regression_endpoint(
     payload: ConsultationInput, registry: ModelRegistry = Depends(get_model_registry)
 ) -> RegressionOutput:
-    return predict_regression(registry.regressor, payload)
+    return predict_regression(registry.regressors, registry.best_regressor_name, payload)

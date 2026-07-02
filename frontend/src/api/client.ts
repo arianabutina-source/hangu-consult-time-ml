@@ -1,4 +1,9 @@
-import type { ApiValidationError, ClassificationOutput, ConsultationInput } from "../types/api";
+import type {
+  ApiValidationError,
+  ClassificationOutput,
+  ConsultationInput,
+  RegressionOutput,
+} from "../types/api";
 
 const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -41,4 +46,8 @@ export function predictClassification(
   payload: ConsultationInput,
 ): Promise<ClassificationOutput> {
   return postJson<ClassificationOutput>("/api/v1/predict/classification", payload);
+}
+
+export function predictRegression(payload: ConsultationInput): Promise<RegressionOutput> {
+  return postJson<RegressionOutput>("/api/v1/predict/regression", payload);
 }

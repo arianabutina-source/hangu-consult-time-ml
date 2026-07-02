@@ -1,11 +1,11 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { usePredictClassification } from "../../hooks/usePredictClassification";
+import { usePredictRegression } from "../../hooks/usePredictRegression";
 import { MODEL_LABELS, sortByModelOrder } from "../../types/api";
 import { ConsultationFormFields } from "./ConsultationFormFields";
 import { consultationSchema, defaultConsultationValues, type ConsultationFormValues } from "./schema";
 
-export function ClassificationForm() {
+export function RegressionForm() {
   const {
     register,
     handleSubmit,
@@ -14,7 +14,7 @@ export function ClassificationForm() {
     resolver: zodResolver(consultationSchema),
     defaultValues: defaultConsultationValues,
   });
-  const { data, error, isLoading, predict } = usePredictClassification();
+  const { data, error, isLoading, predict } = usePredictRegression();
 
   const onSubmit = handleSubmit((values) => predict(values));
 
@@ -42,35 +42,27 @@ export function ClassificationForm() {
             return (
               <div
                 key={row.model}
-                className={`rounded-xl border p-4 ${
+                className={`flex items-center justify-between gap-2 rounded-xl border p-4 ${
                   isBest
                     ? "border-terracotta/30 bg-terracotta-light"
                     : "border-espresso/10 bg-white"
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p
-                    className={`font-serif text-lg font-medium ${
-                      isBest ? "text-terracotta-dark" : "text-espresso"
-                    }`}
-                  >
-                    {row.is_long_consultation ? "Long consultation" : "Short consultation"}
-                  </p>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      isBest
-                        ? "bg-terracotta-dark text-cream"
-                        : "bg-espresso/5 text-espresso-light"
-                    }`}
-                  >
-                    {MODEL_LABELS[row.model] ?? row.model}
-                    {isBest ? " · deployed" : ""}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-espresso-light">
-                  P(long) = {(row.probability_long * 100).toFixed(1)}% &middot; P(short) ={" "}
-                  {(row.probability_short * 100).toFixed(1)}%
+                <p
+                  className={`font-serif text-lg font-medium ${
+                    isBest ? "text-terracotta-dark" : "text-espresso"
+                  }`}
+                >
+                  {row.predicted_duration_minutes.toFixed(1)} minutes
                 </p>
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    isBest ? "bg-terracotta-dark text-cream" : "bg-espresso/5 text-espresso-light"
+                  }`}
+                >
+                  {MODEL_LABELS[row.model] ?? row.model}
+                  {isBest ? " · deployed" : ""}
+                </span>
               </div>
             );
           })}
