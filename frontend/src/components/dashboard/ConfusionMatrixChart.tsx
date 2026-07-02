@@ -14,7 +14,7 @@ export function ConfusionMatrixChart({ dataUrl }: ConfusionMatrixChartProps) {
 
   const max = Math.max(...data.matrix.flat());
   const cellStyle = (value: number) => ({
-    backgroundColor: `rgba(79, 70, 229, ${0.15 + 0.65 * (value / max)})`,
+    backgroundColor: `rgba(2, 195, 154, ${0.15 + 0.65 * (value / max)})`,
   });
 
   return (
@@ -22,20 +22,20 @@ export function ConfusionMatrixChart({ dataUrl }: ConfusionMatrixChartProps) {
       <div className="grid grid-cols-[auto_1fr_1fr] gap-2 text-center text-sm">
         <div />
         {data.labels.map((label) => (
-          <div key={`pred-${label}`} className="font-medium text-slate-600">
+          <div key={`pred-${label}`} className="font-medium text-espresso-light">
             Predicted {label}
           </div>
         ))}
         {data.matrix.map((row, rowIndex) => (
           <div key={data.labels[rowIndex]} className="contents">
-            <div className="flex items-center justify-end pr-2 font-medium text-slate-600">
+            <div className="flex items-center justify-end pr-2 font-medium text-espresso-light">
               Actual {data.labels[rowIndex]}
             </div>
             {row.map((value, colIndex) => (
               <div
                 key={colIndex}
                 style={cellStyle(value)}
-                className="flex items-center justify-center rounded-md py-6 text-lg font-semibold text-indigo-950"
+                className="flex items-center justify-center rounded-md py-6 text-lg font-semibold text-espresso"
               >
                 {value}
               </div>

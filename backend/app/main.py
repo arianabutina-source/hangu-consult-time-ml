@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="Hangu Consultation Duration API",
+    title="Optimised Scheduling Tool API",
     description=(
         "Serves a classification model (long vs. short consultation) and a "
         "regression model (predicted duration in minutes) trained on the "

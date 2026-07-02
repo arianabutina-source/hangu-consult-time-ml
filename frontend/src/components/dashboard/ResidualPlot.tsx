@@ -38,9 +38,9 @@ export function ResidualPlot({ dataUrl }: ResidualPlotProps) {
         unit=" min"
         label={{ value: "Residual (minutes)", angle: -90, position: "insideLeft" }}
       />
-      <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="4 4" />
+      <ReferenceLine y={0} stroke="#05668d" strokeDasharray="4 4" />
       <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-      <Scatter data={data} fill="#4f46e5" fillOpacity={0.5} />
+      <Scatter data={data} fill="#02c39a" fillOpacity={0.5} />
     </ScatterChart>
   );
 }

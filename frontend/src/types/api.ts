@@ -34,7 +34,7 @@ export const ADDRESSES = [
 ] as const;
 export type Address = (typeof ADDRESSES)[number];
 
-/** Request body for both /predict/classification and /predict/regression. */
+/** Request body for /predict/classification. */
 export interface ConsultationInput {
   visit_number: number;
   is_working_day: boolean;
@@ -51,10 +51,6 @@ export interface ClassificationOutput {
   is_long_consultation: boolean;
   probability_long: number;
   probability_short: number;
-}
-
-export interface RegressionOutput {
-  predicted_duration_minutes: number;
 }
 
 /** Shape of a FastAPI validation error response (HTTP 422). */

@@ -11,12 +11,12 @@ interface ConsultationFormFieldsProps {
 export function ConsultationFormFields({ register, errors }: ConsultationFormFieldsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-espresso">
         Visit number
         <input
           type="number"
           min={1}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-espresso/15 px-3 py-2 text-sm shadow-sm focus:border-terracotta focus:outline-none"
           {...register("visit_number", { valueAsNumber: true })}
         />
         {errors.visit_number && (
@@ -24,10 +24,10 @@ export function ConsultationFormFields({ register, errors }: ConsultationFormFie
         )}
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-espresso">
         Month
         <select
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-espresso/15 px-3 py-2 text-sm shadow-sm focus:border-terracotta focus:outline-none"
           {...register("month")}
         >
           {MONTHS.map((month) => (
@@ -38,10 +38,10 @@ export function ConsultationFormFields({ register, errors }: ConsultationFormFie
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-espresso">
         Day of week
         <select
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-espresso/15 px-3 py-2 text-sm shadow-sm focus:border-terracotta focus:outline-none"
           {...register("day_of_week")}
         >
           {DAYS_OF_WEEK.map((day) => (
@@ -52,10 +52,10 @@ export function ConsultationFormFields({ register, errors }: ConsultationFormFie
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-espresso">
         Session
         <select
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-espresso/15 px-3 py-2 text-sm shadow-sm focus:border-terracotta focus:outline-none"
           {...register("session")}
         >
           {SESSION_PERIODS.map((session) => (
@@ -66,10 +66,10 @@ export function ConsultationFormFields({ register, errors }: ConsultationFormFie
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-espresso">
         Gender
         <select
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-espresso/15 px-3 py-2 text-sm shadow-sm focus:border-terracotta focus:outline-none"
           {...register("gender")}
         >
           {GENDERS.map((gender) => (
@@ -80,10 +80,10 @@ export function ConsultationFormFields({ register, errors }: ConsultationFormFie
         </select>
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      <label className="flex flex-col gap-1 text-sm font-medium text-espresso">
         Address
         <select
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+          className="rounded-md border border-espresso/15 px-3 py-2 text-sm shadow-sm focus:border-terracotta focus:outline-none"
           {...register("address")}
         >
           {ADDRESSES.map((address) => (
@@ -94,24 +94,24 @@ export function ConsultationFormFields({ register, errors }: ConsultationFormFie
         </select>
       </label>
 
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-        <input type="checkbox" className="h-4 w-4 rounded border-slate-300" {...register("is_working_day")} />
+      <label className="flex items-center gap-2 text-sm font-medium text-espresso">
+        <input type="checkbox" className="h-4 w-4 rounded border-espresso/15 accent-terracotta" {...register("is_working_day")} />
         Working day
       </label>
 
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+      <label className="flex items-center gap-2 text-sm font-medium text-espresso">
         <input
           type="checkbox"
-          className="h-4 w-4 rounded border-slate-300"
+          className="h-4 w-4 rounded border-espresso/15 accent-terracotta"
           {...register("has_primary_cancer")}
         />
         Primary cancer diagnosis
       </label>
 
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+      <label className="flex items-center gap-2 text-sm font-medium text-espresso">
         <input
           type="checkbox"
-          className="h-4 w-4 rounded border-slate-300"
+          className="h-4 w-4 rounded border-espresso/15 accent-terracotta"
           {...register("has_secondary_cancer")}
         />
         Secondary cancer diagnosis

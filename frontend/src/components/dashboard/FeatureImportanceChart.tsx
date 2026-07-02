@@ -27,7 +27,7 @@ export function FeatureImportanceChart({ dataUrl }: FeatureImportanceChartProps)
       <XAxis type="number" />
       <YAxis type="category" dataKey="feature" width={160} tick={{ fontSize: 12 }} />
       <Tooltip formatter={(value) => (typeof value === "number" ? value.toFixed(4) : value)} />
-      <Bar dataKey="importance" fill="#4f46e5" />
+      <Bar dataKey="importance" fill="#02c39a" />
     </BarChart>
   );
 }

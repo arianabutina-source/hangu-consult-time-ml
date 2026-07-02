@@ -24,7 +24,7 @@ export function ClassificationForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+        className="rounded-full bg-terracotta px-6 py-2.5 text-sm font-semibold text-cream shadow-sm transition-colors hover:bg-terracotta-dark disabled:opacity-50"
       >
         {isLoading ? "Predicting…" : "Predict"}
       </button>
@@ -32,11 +32,11 @@ export function ClassificationForm() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {data && (
-        <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
-          <p className="text-lg font-semibold text-indigo-900">
+        <div className="rounded-xl border border-terracotta/20 bg-terracotta-light p-4">
+          <p className="font-serif text-lg font-medium text-terracotta-dark">
             {data.is_long_consultation ? "Long consultation" : "Short consultation"}
           </p>
-          <p className="mt-1 text-sm text-indigo-700">
+          <p className="mt-1 text-sm text-espresso-light">
             P(long) = {(data.probability_long * 100).toFixed(1)}% &middot; P(short) ={" "}
             {(data.probability_short * 100).toFixed(1)}%
           </p>
