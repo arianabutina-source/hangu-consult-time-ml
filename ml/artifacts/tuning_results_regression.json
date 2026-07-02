@@ -11,6 +11,14 @@
       "model__alpha": 45.70563099801453
     }
   },
+  "decision_tree": {
+    "best_score": -4.414358520525949,
+    "best_params": {
+      "model__max_depth": 5,
+      "model__min_samples_leaf": 14,
+      "model__min_samples_split": 19
+    }
+  },
   "random_forest": {
     "best_score": -4.381701831005353,
     "best_params": {

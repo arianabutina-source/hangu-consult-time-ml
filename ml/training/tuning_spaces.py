@@ -14,6 +14,7 @@ from scipy.stats import loguniform, randint, uniform
 from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from xgboost import XGBClassifier, XGBRegressor
 
 from ml.config import RANDOM_STATE
@@ -31,6 +32,14 @@ CLASSIFICATION_MODELS: dict[str, dict[str, Any]] = {
         "estimator": LogisticRegression(random_state=RANDOM_STATE, max_iter=1000),
         "param_distributions": {
             "model__C": loguniform(1e-3, 1e2),
+        },
+    },
+    "decision_tree": {
+        "estimator": DecisionTreeClassifier(random_state=RANDOM_STATE),
+        "param_distributions": {
+            "model__max_depth": randint(2, 20),
+            "model__min_samples_leaf": randint(1, 20),
+            "model__min_samples_split": randint(2, 20),
         },
     },
     "random_forest": {
@@ -67,6 +76,14 @@ REGRESSION_MODELS: dict[str, dict[str, Any]] = {
         "estimator": Ridge(random_state=RANDOM_STATE),
         "param_distributions": {
             "model__alpha": loguniform(1e-2, 1e3),
+        },
+    },
+    "decision_tree": {
+        "estimator": DecisionTreeRegressor(random_state=RANDOM_STATE),
+        "param_distributions": {
+            "model__max_depth": randint(2, 20),
+            "model__min_samples_leaf": randint(1, 20),
+            "model__min_samples_split": randint(2, 20),
         },
     },
     "random_forest": {

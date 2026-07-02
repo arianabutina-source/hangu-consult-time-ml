@@ -65,6 +65,24 @@ def leaderboard_table(leaderboard: list[dict], columns: list[str]) -> pd.DataFra
             formatted[col.upper() if col in ("mae", "rmse", "r2") else col.replace("_", " ").upper()] = round(row[col], 4)
         rows.append(formatted)
     return pd.DataFrame(rows)
+
+
+def overfit_table(leaderboard: list[dict], metric: str, model_order: list[str]) -> pd.DataFrame:
+    by_name = {row["model"]: row for row in leaderboard}
+    rows = []
+    for name in model_order:
+        row = by_name[name]
+        train_val = row[f"train_{metric}"]
+        test_val = row[metric]
+        rows.append(
+            {
+                "Model": name.replace("_", " ").title(),
+                f"Train {metric.upper()}": round(train_val, 4),
+                f"Test {metric.upper()}": round(test_val, 4),
+                "Gap": round(train_val - test_val, 4),
+            }
+        )
+    return pd.DataFrame(rows)
 ```
 
 ## Introduction and Motivation
@@ -211,12 +229,16 @@ validation/test. The held-out test set is **5,309 train / 1,328 test rows** (≈
 near-identical class balance on both sides (49.8% / 49.8%).
 
 **Model selection.** A full model ladder was compared per task via `RandomizedSearchCV`
-over the group-aware cross-validation: a naive `DummyClassifier`/`DummyRegressor`
-baseline, `LogisticRegression`/`Ridge`, `RandomForestClassifier`/`Regressor`, and
-`XGBClassifier`/`Regressor`. All estimators use a fixed random seed (`random_state=42`).
-The dummy baseline is never a selection candidate in any meaningful sense — it exists so
-every leaderboard below shows exactly how much the tuned models beat "guess from the
-label distribution alone."
+over the group-aware cross-validation, covering four categories: a naive
+`DummyClassifier`/`DummyRegressor` baseline; a linear model
+(`LogisticRegression`/`Ridge`); a single `DecisionTreeClassifier`/`Regressor`; and two
+ensembles, `RandomForestClassifier`/`Regressor` and `XGBClassifier`/`Regressor`. All
+estimators use a fixed random seed (`random_state=42`). The dummy baseline is never a
+selection candidate in any meaningful sense — it exists so every leaderboard below shows
+exactly how much the tuned models beat "guess from the label distribution alone." The
+decision tree is also compared against an *untuned*, depth-unconstrained version of
+itself (`decision_tree_unconstrained`) purely to make overfitting visible — see the
+**Overfitting Check** in each results section below.
 
 **Honest evaluation.** The selected model per task was refit once on the full training set
 and scored **exactly once** on the held-out test set. Those numbers — reported below — were
@@ -235,11 +257,13 @@ tuning_table(clf_tuning, "CV ROC-AUC")
 ```
 
 `{python} clf_tuning["best_model"].replace("_", " ").title()` was selected, narrowly
-outperforming `logistic_regression` and `xgboost` — all three land within about 0.003
+outperforming `logistic_regression` and `xgboost` — the three land within about 0.003
 ROC-AUC of each other, suggesting the ceiling on predictive signal from this feature set
-is fairly firm regardless of model family. The naive `dummy` baseline (predicting from
-the label distribution alone, no features) scores exactly 0.5 CV ROC-AUC, as it must by
-construction — included here as the floor every real candidate must clear.
+is fairly firm regardless of model family. The single `decision_tree` trails a little
+further behind (0.635 CV ROC-AUC) — a lone tree is simply a weaker learner than an
+ensemble of them. The naive `dummy` baseline (predicting from the label distribution
+alone, no features) scores exactly 0.5 CV ROC-AUC, as it must by construction — included
+here as the floor every real candidate must clear.
 
 **Full model-ladder leaderboard, held-out test set (each candidate refit on the full
 training set and scored exactly once — never re-tuned from these numbers):**
@@ -254,7 +278,27 @@ signal. `{python} clf_tuning["best_model"].replace("_", " ").title()` (selected 
 also the top scorer on this particular held-out test set, though by a margin (≤0.003
 ROC-AUC vs. the other tuned candidates) well within what could plausibly reverse on a
 different random split — consistent with the CV-stage finding that model family barely
-matters here.
+matters here. `decision_tree_unconstrained` — an untuned tree with no depth limit,
+included only to illustrate overfitting, not as a real candidate — is the weakest entry
+on test despite the strongest-looking training fit (see below).
+
+**Overfitting check.** A depth-unconstrained decision tree is a textbook way to overfit:
+it keeps splitting until (almost) every leaf is pure, memorising quirks of the training
+set that do not generalise. Comparing it against the depth-tuned `decision_tree` from the
+same leaderboard makes this concrete:
+
+```{python}
+#| label: tbl-clf-overfit
+overfit_table(clf_leaderboard, "roc_auc", ["decision_tree_unconstrained", "decision_tree", "random_forest"])
+```
+
+The unconstrained tree's training ROC-AUC (`{python} f"{[r for r in clf_leaderboard if r['model']=='decision_tree_unconstrained'][0]['train_roc_auc']:.3f}"`)
+looks far stronger than any other candidate's — but its held-out ROC-AUC
+(`{python} f"{[r for r in clf_leaderboard if r['model']=='decision_tree_unconstrained'][0]['roc_auc']:.3f}"`)
+falls to barely above chance, the largest train/test gap of any model tried. Limiting
+tree depth during tuning (`decision_tree`, gap in the table above) closes most of that
+gap; averaging many such trees (`random_forest`) closes it further still — the practical
+reason ensembles are preferred over a single tree here.
 
 **Selected model's metrics in isolation** (the numbers used for the figures below):
 
@@ -325,9 +369,26 @@ this particular held-out test set** (higher R², lower MAE and RMSE), even thoug
 selected Random Forest during model selection. This is not cherry-picked after the fact —
 Random Forest remains the deployed model, selected honestly *before* the test set was
 touched, and the gap between it and XGBoost here is well within the noise expected when
-three model families land this close in cross-validation. It is reported plainly because
+several model families land this close in cross-validation. It is reported plainly because
 the alternative — quietly re-selecting whichever model wins on the test set — is exactly
-the kind of leakage this project is designed to avoid.
+the kind of leakage this project is designed to avoid. The single `decision_tree` lands
+close to `ridge` and behind both ensembles, the same pattern as classification.
+
+**Overfitting check.** The same unconstrained-vs-tuned decision tree comparison as the
+classification task, this time on R²:
+
+```{python}
+#| label: tbl-reg-overfit
+overfit_table(reg_leaderboard, "r2", ["decision_tree_unconstrained", "decision_tree", "random_forest"])
+```
+
+The gap is, if anything, more dramatic here: the unconstrained tree's training R² of
+`{python} f"{[r for r in reg_leaderboard if r['model']=='decision_tree_unconstrained'][0]['train_r2']:.3f}"`
+collapses to a **negative** test R² of
+`{python} f"{[r for r in reg_leaderboard if r['model']=='decision_tree_unconstrained'][0]['r2']:.3f}"`
+— worse than simply predicting the training-set mean for every visit. An unconstrained
+tree doesn't just fail to generalise here, it actively memorises noise that actively hurts
+predictions on new data. Limiting depth during tuning all but closes this gap.
 
 **Selected model's metrics in isolation** (the numbers used for the figures below):
 

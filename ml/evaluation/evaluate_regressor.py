@@ -15,14 +15,21 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.pipeline import Pipeline
+from sklearn.tree import DecisionTreeRegressor
 
 from ml.config import (
+    RANDOM_STATE,
     REGRESSION_TUNING_RESULTS_PATH,
     RESIDUALS_FIGURE_PATH,
     TEST_LEADERBOARD_REGRESSION_PATH,
     TEST_METRICS_REGRESSION_PATH,
 )
-from ml.evaluation.leaderboard import build_test_leaderboard, save_leaderboard, sort_leaderboard
+from ml.evaluation.leaderboard import (
+    build_test_leaderboard,
+    evaluate_naive_model,
+    save_leaderboard,
+    sort_leaderboard,
+)
 from ml.evaluation.metrics import regression_metrics, save_metrics
 from ml.pipelines.regression_pipeline import build_regression_pipeline
 from ml.training.search import build_best_pipeline_from_results, load_tuning_results
@@ -90,7 +97,12 @@ def build_regression_test_leaderboard(
 ) -> list[dict[str, float]]:
     """Refit every candidate in ``REGRESSION_MODELS`` (incl. ``dummy``) on the
     full training set and score all of them on the held-out test set,
-    sorted best-first by R^2.
+    sorted best-first by R^2. Each row also includes ``train_<metric>``
+    values, and one extra row -- ``decision_tree_unconstrained``, a
+    ``DecisionTreeRegressor`` with its *default* (unlimited) depth -- is
+    appended to make the overfitting of an untuned tree visible: expect its
+    train R^2 near 1.0 and its test R^2 well below the tuned
+    ``decision_tree`` entry (often negative).
     """
     tuning_results = load_tuning_results(tuning_results_path)
     leaderboard = build_test_leaderboard(
@@ -103,6 +115,20 @@ def build_regression_test_leaderboard(
         y_test,
         regression_metrics,
         use_predict_proba=False,
+        include_train_metrics=True,
+    )
+    leaderboard.append(
+        evaluate_naive_model(
+            "decision_tree_unconstrained",
+            DecisionTreeRegressor(random_state=RANDOM_STATE),
+            build_regression_pipeline,
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            regression_metrics,
+            use_predict_proba=False,
+        )
     )
     return sort_leaderboard(leaderboard, "r2", higher_is_better=True)
 

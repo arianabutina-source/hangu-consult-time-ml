@@ -18,15 +18,22 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, roc_auc_score, roc_curve
 from sklearn.pipeline import Pipeline
+from sklearn.tree import DecisionTreeClassifier
 
 from ml.config import (
     CLASSIFICATION_TUNING_RESULTS_PATH,
     CONFUSION_MATRIX_FIGURE_PATH,
+    RANDOM_STATE,
     ROC_CURVE_FIGURE_PATH,
     TEST_LEADERBOARD_CLASSIFICATION_PATH,
     TEST_METRICS_CLASSIFICATION_PATH,
 )
-from ml.evaluation.leaderboard import build_test_leaderboard, save_leaderboard, sort_leaderboard
+from ml.evaluation.leaderboard import (
+    build_test_leaderboard,
+    evaluate_naive_model,
+    save_leaderboard,
+    sort_leaderboard,
+)
 from ml.evaluation.metrics import classification_metrics, save_metrics
 from ml.pipelines.classification_pipeline import build_classification_pipeline
 from ml.training.search import build_best_pipeline_from_results, load_tuning_results
@@ -127,7 +134,12 @@ def build_classification_test_leaderboard(
 ) -> list[dict[str, float]]:
     """Refit every candidate in ``CLASSIFICATION_MODELS`` (incl. ``dummy``) on
     the full training set and score all of them on the held-out test set,
-    sorted best-first by ROC-AUC.
+    sorted best-first by ROC-AUC. Each row also includes ``train_<metric>``
+    values, and one extra row -- ``decision_tree_unconstrained``, a
+    ``DecisionTreeClassifier`` with its *default* (unlimited) depth -- is
+    appended to make the overfitting of an untuned tree visible: expect its
+    train metrics near-perfect and its test metrics well below the tuned
+    ``decision_tree`` entry.
     """
     tuning_results = load_tuning_results(tuning_results_path)
     leaderboard = build_test_leaderboard(
@@ -140,6 +152,20 @@ def build_classification_test_leaderboard(
         y_test,
         classification_metrics,
         use_predict_proba=True,
+        include_train_metrics=True,
+    )
+    leaderboard.append(
+        evaluate_naive_model(
+            "decision_tree_unconstrained",
+            DecisionTreeClassifier(random_state=RANDOM_STATE),
+            build_classification_pipeline,
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            classification_metrics,
+            use_predict_proba=True,
+        )
     )
     return sort_leaderboard(leaderboard, "roc_auc", higher_is_better=True)
 

@@ -35,6 +35,7 @@ from ml.evaluation.evaluate_regressor import (
 )
 from ml.evaluation.leaderboard import (
     build_test_leaderboard,
+    evaluate_naive_model,
     load_leaderboard,
     save_leaderboard,
     sort_leaderboard,
@@ -277,6 +278,58 @@ def test_build_test_leaderboard_scores_every_candidate() -> None:
     # "best_model" bookkeeping key must never leak into the scored rows.
     assert all("best_model" not in row for row in leaderboard)
 
+    leaderboard_with_train = build_test_leaderboard(
+        fake_results,
+        fake_models,
+        identity_pipeline_builder,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        classification_metrics,
+        use_predict_proba=True,
+        include_train_metrics=True,
+    )
+    for row in leaderboard_with_train:
+        assert "train_roc_auc" in row
+        assert "roc_auc" in row
+        assert 0.0 <= row["train_roc_auc"] <= 1.0
+
+
+def test_evaluate_naive_model_shows_overfitting() -> None:
+    """An unconstrained Decision Tree should fit training data almost
+    perfectly while generalising far worse -- the overfitting signature this
+    naive-model comparison exists to surface."""
+    from sklearn.pipeline import Pipeline
+    from sklearn.tree import DecisionTreeRegressor
+
+    rng = np.random.default_rng(0)
+    X_train = pd.DataFrame({"numeric__x": rng.normal(size=150)})
+    y_train = pd.Series(rng.normal(size=150))  # pure noise: no real signal to learn
+    X_test = pd.DataFrame({"numeric__x": rng.normal(size=50)})
+    y_test = pd.Series(rng.normal(size=50))
+
+    def identity_pipeline_builder(estimator):
+        return Pipeline(steps=[("model", estimator)])
+
+    row = evaluate_naive_model(
+        "decision_tree_unconstrained",
+        DecisionTreeRegressor(random_state=0),
+        identity_pipeline_builder,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        regression_metrics,
+        use_predict_proba=False,
+    )
+
+    assert row["model"] == "decision_tree_unconstrained"
+    # An unconstrained tree on pure noise memorises the training set almost
+    # exactly (R^2 close to 1) but cannot generalise (test R^2 far lower).
+    assert row["train_r2"] > 0.9
+    assert row["train_r2"] > row["r2"]
+
 
 def test_sort_leaderboard_orders_best_first() -> None:
     leaderboard = [
@@ -310,15 +363,29 @@ def test_classification_leaderboard_includes_dummy_baseline(
 
     leaderboard = build_classification_test_leaderboard(X_train, y_train, X_test, y_test)
 
-    assert len(leaderboard) == len(CLASSIFICATION_MODELS)
+    # One extra row beyond the tuned ladder: decision_tree_unconstrained.
+    assert len(leaderboard) == len(CLASSIFICATION_MODELS) + 1
     model_names = {row["model"] for row in leaderboard}
     assert "dummy" in model_names
-    assert {"logistic_regression", "random_forest", "xgboost"} <= model_names
+    assert "decision_tree_unconstrained" in model_names
+    assert {"logistic_regression", "decision_tree", "random_forest", "xgboost"} <= model_names
     for row in leaderboard:
         assert 0.0 <= row["roc_auc"] <= 1.0
+        assert "train_roc_auc" in row
     # Leaderboard is sorted best-first by ROC-AUC.
     scores = [row["roc_auc"] for row in leaderboard]
     assert scores == sorted(scores, reverse=True)
+
+    by_name = {row["model"]: row for row in leaderboard}
+    # The overfitting signature this comparison exists to demonstrate: the
+    # unconstrained tree fits training data far better than it predicts on
+    # test, unlike the depth-tuned decision_tree entry.
+    unconstrained = by_name["decision_tree_unconstrained"]
+    tuned_tree = by_name["decision_tree"]
+    assert unconstrained["train_accuracy"] > unconstrained["accuracy"]
+    unconstrained_gap = unconstrained["train_accuracy"] - unconstrained["accuracy"]
+    tuned_gap = tuned_tree["train_accuracy"] - tuned_tree["accuracy"]
+    assert unconstrained_gap > tuned_gap
 
 
 @pytest.mark.skipif(
@@ -333,10 +400,29 @@ def test_regression_leaderboard_includes_dummy_baseline(
 
     leaderboard = build_regression_test_leaderboard(X_train, y_train, X_test, y_test)
 
-    assert len(leaderboard) == len(REGRESSION_MODELS)
+    # One extra row beyond the tuned ladder: decision_tree_unconstrained.
+    assert len(leaderboard) == len(REGRESSION_MODELS) + 1
     model_names = {row["model"] for row in leaderboard}
     assert "dummy" in model_names
-    assert {"ridge", "random_forest", "xgboost"} <= model_names
+    assert "decision_tree_unconstrained" in model_names
+    assert {"ridge", "decision_tree", "random_forest", "xgboost"} <= model_names
+    for row in leaderboard:
+        assert "train_r2" in row
     # Leaderboard is sorted best-first by R^2.
     scores = [row["r2"] for row in leaderboard]
     assert scores == sorted(scores, reverse=True)
+
+    by_name = {row["model"]: row for row in leaderboard}
+    # The overfitting signature this comparison exists to demonstrate: the
+    # unconstrained tree fits training data far better than it predicts on
+    # test, unlike the depth-tuned decision_tree entry.
+    unconstrained = by_name["decision_tree_unconstrained"]
+    tuned_tree = by_name["decision_tree"]
+    # Real feature rows repeat across patients (many share identical
+    # categorical bins), so even an unconstrained tree can't reach a
+    # synthetic-data-style near-perfect fit -- but it still fits training
+    # data far better than it predicts on held-out test data.
+    assert unconstrained["train_r2"] > unconstrained["r2"]
+    unconstrained_gap = unconstrained["train_r2"] - unconstrained["r2"]
+    tuned_gap = tuned_tree["train_r2"] - tuned_tree["r2"]
+    assert unconstrained_gap > tuned_gap
