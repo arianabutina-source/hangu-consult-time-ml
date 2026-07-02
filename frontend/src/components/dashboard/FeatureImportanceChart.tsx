@@ -1,6 +1,7 @@
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { useJsonData } from "../../hooks/useJsonData";
 import type { FeatureImportanceRecord } from "../../types/dashboard";
+import { prettifyFeatureName } from "../../utils/featureLabels";
 
 interface FeatureImportanceChartProps {
   dataUrl: string;
@@ -13,7 +14,9 @@ export function FeatureImportanceChart({ dataUrl }: FeatureImportanceChartProps)
   if (error) return <p className="text-sm text-red-600">{error}</p>;
   if (!data) return null;
 
-  const chartData = [...data].reverse(); // highest importance at the top
+  const chartData = [...data]
+    .reverse() // highest importance at the top
+    .map((row) => ({ ...row, feature: prettifyFeatureName(row.feature) }));
 
   return (
     <BarChart
